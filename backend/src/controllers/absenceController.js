@@ -1,6 +1,7 @@
 import AbsenceRecord from '../models/AbsenceRecord.js';
 import TraineeAbsence from '../models/TraineeAbsence.js';
 import Trainee from '../models/Trainee.js';
+import Group from '../models/Group.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import moment from 'moment';
 
@@ -9,7 +10,8 @@ import moment from 'moment';
 // @access  Private (SG/Teacher)
 export const markAbsence = asyncHandler(async (req, res) => {
   const { 
-    groupId, 
+    groupId,
+    groupe, // Accept group name as well
     date, 
     startTime, 
     endTime, 
@@ -17,9 +19,29 @@ export const markAbsence = asyncHandler(async (req, res) => {
     absences // Array of { traineeId, status }
   } = req.body;
 
+  // If groupe (name) is provided instead of groupId, look it up
+  let finalGroupId = groupId;
+  if (!finalGroupId && groupe) {
+    const group = await Group.findOne({ name: groupe });
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: `Group "${groupe}" not found`
+      });
+    }
+    finalGroupId = group._id;
+  }
+
+  if (!finalGroupId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Group ID or group name is required'
+    });
+  }
+
   // Create Absence Record
   const absenceRecord = await AbsenceRecord.create({
-    groupId,
+    groupId: finalGroupId,
     date,
     startTime,
     endTime,
@@ -121,18 +143,43 @@ export const getGroupAbsencesByName = asyncHandler(async (req, res) => {
   const { group } = req.params; // param is :group in group.routes.js
   const { date } = req.query;
 
-  const query = { groupId: group }; // groupId in model stores the name/code
-  if (date) {
-    query.date = date;
+  // Find the group by name
+  const groupDoc = await Group.findOne({ name: group });
+  if (!groupDoc) {
+    return res.status(404).json({
+      success: false,
+      message: `Group "${group}" not found`
+    });
   }
 
+  // Build query using the group's ObjectId
+  const query = { groupId: groupDoc._id };
+  if (date) {
+    query.date = new Date(date);
+  }
+
+  // Find absence records
   const records = await AbsenceRecord.find(query)
     .populate('teacherId', 'name firstName lastName')
     .sort({ date: -1, startTime: -1 });
 
+  // For each record, get the trainee absences
+  const recordsWithDetails = await Promise.all(
+    records.map(async (record) => {
+      const traineeAbsences = await TraineeAbsence.find({
+        absenceRecordId: record._id
+      }).populate('traineeId', 'cef name firstName');
+
+      return {
+        ...record.toObject(),
+        absences: traineeAbsences
+      };
+    })
+  );
+
   res.json({
     success: true,
-    data: records,
+    data: recordsWithDetails,
   });
 });
 

@@ -20,14 +20,17 @@ const userService = {
       if (roleFilter === 'all' || roleFilter === USER_ROLES.TEACHER) {
         const response = await api.get('/teachers');
         if (response.data.success) {
-          // Normalize teacher data to match user structure if needed
+          // Normalize teacher data to match user structure
           const teachers = response.data.data.map(t => ({
             _id: t._id,
             name: `${t.firstName} ${t.lastName}`,
+            firstName: t.firstName,
+            lastName: t.lastName,
             email: t.email,
             role: USER_ROLES.TEACHER,
             status: t.isActive ? 'active' : 'inactive',
             createdAt: t.createdAt,
+            // Keep groups as objects (they're populated from backend)
             groups: t.groups || []
           }));
           users = [...users, ...teachers];

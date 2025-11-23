@@ -1,18 +1,19 @@
 import express from 'express';
 import {
-  getTeachers,
+  getAllTeachers,
   createTeacher,
   getTeacher,
   updateTeacher,
   deleteTeacher,
   uploadSchedule,
 } from '../controllers/teacherController.js';
+import { protect } from '../middleware/auth.js';
 import upload from '../config/multer.js';
 
 const router = express.Router();
 
 router.route('/')
-  .get(getTeachers)
+  .get(protect, getAllTeachers)
   .post(createTeacher);
 
 router.route('/:id')

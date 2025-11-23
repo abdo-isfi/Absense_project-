@@ -4,18 +4,16 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get all teachers
 // @route   GET /api/teachers
-// @access  Public
-export const getTeachers = asyncHandler(async (req, res) => {
-  const teachers = await Teacher.find().populate('groups');
-  
-  const teachersData = teachers.map(teacher => ({
-    ...teacher.toObject(),
-    groups: teacher.groups.map(g => g.name),
-  }));
+// @access  Private (Admin/SG)
+export const getAllTeachers = asyncHandler(async (req, res) => {
+  const teachers = await Teacher.find()
+    .populate('groups', 'name') // Populate group names
+    .select('-password')
+    .sort({ createdAt: -1 });
 
   res.json({
     success: true,
-    data: teachersData,
+    data: teachers,
   });
 });
 
@@ -85,16 +83,6 @@ export const updateTeacher = asyncHandler(async (req, res) => {
   if (email) teacher.email = email;
   if (matricule) teacher.matricule = matricule;
   if (password) teacher.password = password;
-
-  // Update groups if provided
-  if (groups && Array.isArray(groups)) {
-    const groupDocs = await Group.find({ name: { $in: groups } });
-    teacher.groups = groupDocs.map(g => g._id);
-  }
-
-  await teacher.save();
-
-  await teacher.populate('groups');
 
   const teacherData = {
     ...teacher.toObject(),

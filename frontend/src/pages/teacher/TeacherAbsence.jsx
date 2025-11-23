@@ -40,6 +40,12 @@ const TeacherAbsence = () => {
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
   const [absenceData, setAbsenceData] = useState({});
+  
+  // Conflict detection and edit mode
+  const [hasConflict, setHasConflict] = useState(false);
+  const [existingAbsences, setExistingAbsences] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [checkingConflict, setCheckingConflict] = useState(false);
 
   useEffect(() => {
     fetchTeacherGroups();
@@ -48,8 +54,33 @@ const TeacherAbsence = () => {
   useEffect(() => {
     if (selectedGroup) {
       fetchGroupTrainees();
+      checkForExistingAbsences();
     }
-  }, [selectedGroup]);
+  }, [selectedGroup, absenceDate]);
+
+  // Check for existing absences when group or date changes
+  const checkForExistingAbsences = async () => {
+    if (!selectedGroup || !absenceDate) return;
+    
+    setCheckingConflict(true);
+    try {
+      const response = await absenceService.getGroupAbsencesByName(selectedGroup, absenceDate);
+      if (response.success && response.data && response.data.length > 0) {
+        setHasConflict(true);
+        setExistingAbsences(response.data);
+      } else {
+        setHasConflict(false);
+        setExistingAbsences([]);
+        setIsEditMode(false);
+      }
+    } catch (err) {
+      console.error('Error checking for existing absences:', err);
+      setHasConflict(false);
+      setExistingAbsences([]);
+    } finally {
+      setCheckingConflict(false);
+    }
+  };
 
   const fetchTeacherGroups = async () => {
     setLoading(true);
@@ -109,6 +140,57 @@ const TeacherAbsence = () => {
     }));
   };
 
+  const handleEditMode = () => {
+    if (existingAbsences.length === 0) return;
+    
+    const mostRecent = existingAbsences[0];
+    setIsEditMode(true);
+    
+    // Load existing times
+    setStartTime(mostRecent.startTime);
+    setEndTime(mostRecent.endTime);
+    
+    // Load existing statuses
+    if (mostRecent.absences && mostRecent.absences.length > 0) {
+      const statusMap = {};
+      mostRecent.absences.forEach(abs => {
+        if (abs.traineeId && abs.traineeId._id) {
+          statusMap[abs.traineeId._id] = {
+            status: abs.status,
+            isJustified: abs.isJustified || false
+          };
+        }
+      });
+      
+      // Merge with current absenceData to preserve all trainees
+      setAbsenceData(prev => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach(traineeId => {
+          if (statusMap[traineeId]) {
+            updated[traineeId] = statusMap[traineeId];
+          }
+        });
+        return updated;
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setStartTime('');
+    setEndTime('');
+    
+    // Reset statuses to present
+    const resetData = {};
+    trainees.forEach(trainee => {
+      resetData[trainee._id] = {
+        status: 'present',
+        isJustified: false
+      };
+    });
+    setAbsenceData(resetData);
+  };
+
   const handleSubmit = async () => {
     // Validation
     const errors = {};
@@ -147,17 +229,17 @@ const TeacherAbsence = () => {
       await absenceService.markAbsences({
         groupe: selectedGroup,
         date: absenceDate,
-        startTime: startTime + ':00',
-        endTime: endTime + ':00',
+        startTime: startTime,
+        endTime: endTime,
         absences
       });
 
       setSuccess(`${absences.length} absence(s) enregistrée(s) avec succès`);
       
-      // Reset form
+      // Reload page after short delay to show success message
       setTimeout(() => {
-        setSuccess('');
-      }, 3000);
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setError('Erreur lors de l\'enregistrement des absences');
     } finally {
@@ -206,6 +288,39 @@ const TeacherAbsence = () => {
       {/* Alerts */}
       {success && <Alert type="success" dismissible onDismiss={() => setSuccess('')}>{success}</Alert>}
       {error && <Alert type="error" dismissible onDismiss={() => setError('')}>{error}</Alert>}
+      
+      {/* Conflict Warning */}
+      {hasConflict && !isEditMode && (
+        <Alert type="warning">
+          <div className="flex items-center justify-between">
+            <div>
+              <strong>Attention:</strong> Des absences existent déjà pour ce groupe à cette date.
+              {existingAbsences.length > 0 && (
+                <span className="ml-2 text-sm">
+                  ({existingAbsences.length} enregistrement{existingAbsences.length > 1 ? 's' : ''})
+                </span>
+              )}
+            </div>
+            <Button size="sm" variant="primary" onClick={handleEditMode}>
+              Modifier
+            </Button>
+          </div>
+        </Alert>
+      )}
+      
+      {/* Edit Mode Indicator */}
+      {isEditMode && (
+        <Alert type="info">
+          <div className="flex items-center justify-between">
+            <div>
+              <strong>Mode Édition:</strong> Vous modifiez un enregistrement existant.
+            </div>
+            <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+              Annuler
+            </Button>
+          </div>
+        </Alert>
+      )}
 
       {/* Filters */}
       <Card>
@@ -261,9 +376,9 @@ const TeacherAbsence = () => {
                 variant="primary" 
                 onClick={handleSubmit}
                 loading={saving}
-                disabled={!selectedGroup || !startTime || !endTime}
+                disabled={!selectedGroup || !startTime || !endTime || (hasConflict && !isEditMode)}
               >
-                Enregistrer les absences
+                {isEditMode ? 'Mettre à jour les absences' : 'Enregistrer les absences'}
               </Button>
             </div>
 
