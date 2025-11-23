@@ -29,7 +29,6 @@ const Sidebar = ({ userRole, isCollapsed = false }) => {
         return [
           { name: 'Dashboard', icon: HomeIcon, path: ROUTES.SG.DASHBOARD },
           { name: 'Gérer Stagiaires', icon: UserGroupIcon, path: ROUTES.SG.MANAGE_TRAINEES },
-          { name: 'Liste Stagiaires', icon: UsersIcon, path: ROUTES.SG.TRAINEES_LIST },
           { name: 'Gérer Formateurs', icon: UsersIcon, path: ROUTES.SG.MANAGE_TEACHERS },
           { name: 'Suivi Absences', icon: DocumentChartBarIcon, path: ROUTES.SG.ABSENCE },
           { name: 'Export', icon: ArrowDownTrayIcon, path: ROUTES.SG.EXPORT },

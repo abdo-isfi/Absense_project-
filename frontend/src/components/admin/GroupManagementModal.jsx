@@ -20,9 +20,10 @@ const GroupManagementModal = ({ isOpen, onClose, teacher, onSave }) => {
     if (isOpen && teacher) {
       fetchGroups();
       // Initialize selected groups from teacher object if available
-      // Assuming teacher.groups contains array of group IDs or objects
+      // Assuming teacher.groups contains array of group objects (populated) or strings
       if (teacher.groups) {
-        setSelectedGroups(teacher.groups.map(g => typeof g === 'object' ? g._id : g));
+        // Map to names, handling both populated objects and raw strings/IDs if any
+        setSelectedGroups(teacher.groups.map(g => typeof g === 'object' ? g.name : g));
       } else {
         setSelectedGroups([]);
       }
@@ -33,7 +34,7 @@ const GroupManagementModal = ({ isOpen, onClose, teacher, onSave }) => {
     setLoading(true);
     try {
       const response = await groupService.getAllGroups();
-      setGroups(response.data || []);
+      setGroups(response || []);
     } catch (error) {
       console.error('Error fetching groups:', error);
     } finally {
@@ -41,12 +42,12 @@ const GroupManagementModal = ({ isOpen, onClose, teacher, onSave }) => {
     }
   };
 
-  const handleCheckboxChange = (groupId) => {
+  const handleCheckboxChange = (groupName) => {
     setSelectedGroups(prev => {
-      if (prev.includes(groupId)) {
-        return prev.filter(id => id !== groupId);
+      if (prev.includes(groupName)) {
+        return prev.filter(name => name !== groupName);
       } else {
-        return [...prev, groupId];
+        return [...prev, groupName];
       }
     });
   };
@@ -66,54 +67,7 @@ const GroupManagementModal = ({ isOpen, onClose, teacher, onSave }) => {
     }
   };
 
-  const handlePrint = () => {
-    const printContent = document.getElementById('printable-groups');
-    const windowUrl = 'about:blank';
-    const uniqueName = new Date();
-    const windowName = 'Print' + uniqueName.getTime();
-    const printWindow = window.open(windowUrl, windowName, 'left=50000,top=50000,width=0,height=0');
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Groupes - ${teacher.name}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { font-size: 18px; margin-bottom: 10px; }
-            ul { list-style-type: none; padding: 0; }
-            li { padding: 5px 0; border-bottom: 1px solid #eee; }
-          </style>
-        </head>
-        <body>
-          <h1>Formateur: ${teacher.name}</h1>
-          <h2>Groupes assignés:</h2>
-          <ul>
-            ${groups
-              .filter(g => selectedGroups.includes(g._id))
-              .map(g => `<li>${g.name}</li>`)
-              .join('')}
-          </ul>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
-  };
-
-  const handleDownload = () => {
-    const assignedGroups = groups.filter(g => selectedGroups.includes(g._id));
-    const content = `Formateur: ${teacher.name}\n\nGroupes assignés:\n${assignedGroups.map(g => `- ${g.name}`).join('\n')}`;
-    
-    const element = document.createElement('a');
-    const file = new Blob([content], {type: 'text/plain'});
-    element.href = URL.createObjectURL(file);
-    element.download = `groupes_${teacher.name.replace(/\s+/g, '_')}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  };
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
@@ -132,34 +86,44 @@ const GroupManagementModal = ({ isOpen, onClose, teacher, onSave }) => {
           </div>
 
           <div className="p-6">
-            <div className="flex justify-end gap-2 mb-4">
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <PrinterIcon className="h-4 w-4 mr-2" />
-                Imprimer
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
-                Télécharger
-              </Button>
-            </div>
-
-            <div id="printable-groups" className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+            <div id="printable-groups" className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
               {loading ? (
-                <div className="text-center py-4">Chargement...</div>
+                <div className="text-center py-8 text-gray-500">Chargement des groupes...</div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {groups.map(group => (
-                    <label key={group._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedGroups.includes(group._id)}
-                        onChange={() => handleCheckboxChange(group._id)}
-                        className="h-4 w-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                      />
-                      <span className="text-gray-700">{group.name}</span>
-                    </label>
-                  ))}
-                </div>
+                <>
+                  {groups.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">Aucun groupe disponible</div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {groups
+                        .map(group => {
+                          const isSelected = selectedGroups.includes(group.name);
+                          return (
+                            <div 
+                              key={group._id} 
+                              onClick={() => handleCheckboxChange(group.name)}
+                              className={`
+                                cursor-pointer p-3 rounded-lg border transition-all duration-200 flex items-center justify-between group
+                                ${isSelected 
+                                  ? 'bg-primary-50 border-primary-500 shadow-sm' 
+                                  : 'bg-white border-gray-200 hover:border-primary-300 hover:shadow-sm'}
+                              `}
+                            >
+                              <span className={`font-medium ${isSelected ? 'text-primary-700' : 'text-gray-700'}`}>
+                                {group.name}
+                              </span>
+                              <div className={`
+                                w-5 h-5 rounded-full border flex items-center justify-center transition-colors
+                                ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-gray-300 group-hover:border-primary-400'}
+                              `}>
+                                {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

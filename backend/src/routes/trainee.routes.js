@@ -1,43 +1,33 @@
 import express from 'express';
 import {
-  getTrainees,
-  getTraineesWithStats,
   createTrainee,
-  getTrainee,
+  getAllTrainees,
+  getTraineeById,
   updateTrainee,
   deleteTrainee,
-  deleteAllTrainees,
-  getTraineeAbsences,
-  getTraineeStatistics,
-  bulkImport,
   importTrainees,
+  getTraineesWithStats,
+  deleteAllTrainees,
 } from '../controllers/traineeController.js';
-import upload from '../config/multer.js';
-import { validate } from '../middleware/validate.js';
-import { 
-  createTraineeValidation, 
-  updateTraineeValidation,
-  cefValidation 
-} from '../utils/validationSchemas.js';
-import { uploadLimiter } from '../middleware/rateLimiter.js';
+import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.get('/with-stats', getTraineesWithStats);
-router.delete('/delete-all', deleteAllTrainees);
-router.post('/bulk-import', bulkImport);
-router.post('/import', uploadLimiter, upload.single('file'), importTrainees);
+router.use(protect);
 
-router.route('/')
-  .get(getTrainees)
-  .post(createTraineeValidation, validate, createTrainee);
+router
+  .route('/')
+  .post(authorize('sg', 'admin'), createTrainee)
+  .get(getAllTrainees);
 
-router.route('/:cef')
-  .get(cefValidation, validate, getTrainee)
-  .put(cefValidation, updateTraineeValidation, validate, updateTrainee)
-  .delete(cefValidation, validate, deleteTrainee);
+router.post('/import', authorize('sg', 'admin'), importTrainees);
+router.get('/with-stats', authorize('sg', 'admin'), getTraineesWithStats);
+router.delete('/delete-all', authorize('sg', 'admin'), deleteAllTrainees);
 
-router.get('/:cef/absences', cefValidation, validate, getTraineeAbsences);
-router.get('/:cef/statistics', cefValidation, validate, getTraineeStatistics);
+router
+  .route('/:id')
+  .get(getTraineeById)
+  .put(authorize('sg', 'admin'), updateTrainee)
+  .delete(authorize('sg', 'admin'), deleteTrainee);
 
 export default router;

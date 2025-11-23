@@ -1,159 +1,85 @@
+import mongoose from 'mongoose';
 import Trainee from '../models/Trainee.js';
-import TraineeAbsence from '../models/TraineeAbsence.js';
-import Dropout from '../models/Dropout.js';
-import Group from '../models/Group.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { calculateTotalAbsenceHours, getDisciplinaryStatus } from '../services/absenceCalculator.js';
-import { importFromExcel, importFromCSV, saveTrainees } from '../services/excelImporter.js';
-import path from 'path';
-import fs from 'fs';
 
-// @desc    Get all trainees
-// @route   GET /api/trainees
-// @access  Public
-export const getTrainees = asyncHandler(async (req, res) => {
-  const { group } = req.query;
-  
-  const query = group ? { groupe: group } : {};
-  
-  const trainees = await Trainee.find(query);
-  
-  // Add statistics to each trainee
-  const traineesWithStats = await Promise.all(trainees.map(async (trainee) => {
-    const totalAbsenceHours = await trainee.calculateTotalAbsenceHours();
-    const disciplinaryNote = await trainee.calculateDisciplinaryNote();
-    
-    return {
-      ...trainee.toObject(),
-      totalAbsenceHours,
-      disciplinaryNote,
-    };
-  }));
-
-  res.json({
-    success: true,
-    data: traineesWithStats,
-  });
-});
-
-// @desc    Get trainees with detailed stats
-// @route   GET /api/trainees/with-stats
-// @access  Public
-export const getTraineesWithStats = asyncHandler(async (req, res) => {
-  const trainees = await Trainee.find().select('id cef name firstName groupe phone');
-  
-  const traineeIds = trainees.map(t => t._id);
-  const absences = await TraineeAbsence.find({ traineeId: { $in: traineeIds } })
-    .populate('absenceRecordId');
-
-  const absencesByTrainee = {};
-  absences.forEach(abs => {
-    const traineeId = abs.traineeId.toString();
-    if (!absencesByTrainee[traineeId]) {
-      absencesByTrainee[traineeId] = [];
-    }
-    absencesByTrainee[traineeId].push({
-      ...abs.toObject(),
-      is_validated: abs.absenceRecordId?.isValidated ?? false,
-    });
-  });
-
-  const result = trainees.map(t => {
-    const abs = absencesByTrainee[t._id.toString()] || [];
-    const hours = calculateTotalAbsenceHours(abs);
-    const disciplinaryStatus = getDisciplinaryStatus(hours);
-
-    return {
-      id: t._id,
-      cef: t.cef,
-      name: t.name,
-      first_name: t.firstName,
-      groupe: t.groupe,
-      phone: t.phone,
-      totalAbsenceHours: hours,
-      disciplinaryStatus,
-      disciplinaryNote: Math.max(0, 20 - Math.floor(hours / 5)),
-      absences: abs.map(a => ({
-        id: a._id,
-        status: a.status,
-        is_justified: a.isJustified,
-        absence_hours: a.absenceHours,
-        is_validated: a.is_validated,
-        isValidated: a.is_validated,
-      })),
-    };
-  });
-
-  res.json(result);
-});
-
-// @desc    Create trainee
+// @desc    Create a new trainee
 // @route   POST /api/trainees
-// @access  Public
+// @access  Private (SG/Admin)
 export const createTrainee = asyncHandler(async (req, res) => {
-  const { cef, name, first_name, groupe } = req.body;
+  const { cef, name, firstName, groupe, phone } = req.body;
+
+  const traineeExists = await Trainee.findOne({ cef });
+  if (traineeExists) {
+    return res.status(400).json({
+      success: false,
+      message: 'Trainee with this CEF already exists',
+    });
+  }
 
   const trainee = await Trainee.create({
     cef,
     name,
-    firstName: first_name,
+    firstName,
     groupe,
+    phone,
   });
 
-  res.status(201).json(trainee);
+  res.status(201).json({
+    success: true,
+    data: trainee,
+    message: 'Trainee created successfully',
+  });
 });
 
-// @desc    Get single trainee
-// @route   GET /api/trainees/:cef
-// @access  Public
-export const getTrainee = asyncHandler(async (req, res) => {
-  const trainee = await Trainee.findOne({ cef: req.params.cef });
-
-  if (!trainee) {
-    return res.status(404).json({
-      success: false,
-      message: 'Trainee not found',
-    });
+// @desc    Get all trainees
+// @route   GET /api/trainees
+// @access  Private (SG/Admin/Teacher)
+export const getAllTrainees = asyncHandler(async (req, res) => {
+  const { group, search, page = 1, limit = 10 } = req.query;
+  
+  const query = {};
+  
+  // Filter by group
+  if (group) {
+    query.groupe = group;
+  }
+  
+  // Search by name or CEF
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { firstName: { $regex: search, $options: 'i' } },
+      { cef: { $regex: search, $options: 'i' } },
+    ];
   }
 
-  const absences = await TraineeAbsence.find({ traineeId: trainee._id })
-    .populate('absenceRecordId');
-
-  const totalAbsenceHours = await trainee.calculateTotalAbsenceHours();
-  const disciplineScore = await trainee.calculateDisciplinaryNote();
-
-  const absenceStats = {
-    absent: await TraineeAbsence.countDocuments({ traineeId: trainee._id, status: 'absent' }),
-    late: await TraineeAbsence.countDocuments({ traineeId: trainee._id, status: 'late' }),
-    justified: await TraineeAbsence.countDocuments({ traineeId: trainee._id, isJustified: true }),
-  };
-
-  const absenceHistory = absences.map(absence => ({
-    id: absence._id,
-    date: absence.absenceRecordId?.date || 'N/A',
-    time: `${absence.absenceRecordId?.startTime} - ${absence.absenceRecordId?.endTime}`,
-    status: absence.status,
-    source: absence.isJustified ? 'Justifié' : 'Non justifié',
-    color: absence.status === 'absent' ? 'text-danger' : (absence.status === 'late' ? 'text-warning' : 'text-success'),
-  }));
+  // Pagination
+  const skip = (page - 1) * limit;
+  
+  const trainees = await Trainee.find(query)
+    .sort({ groupe: 1, name: 1 })
+    .skip(skip)
+    .limit(Number(limit));
+    
+  const total = await Trainee.countDocuments(query);
 
   res.json({
     success: true,
-    data: {
-      ...trainee.toObject(),
-      absenceStats,
-      totalAbsenceHours,
-      disciplineScore,
-      absenceHistory,
+    data: trainees,
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      pages: Math.ceil(total / limit),
     },
   });
 });
 
-// @desc    Update trainee
-// @route   PUT /api/trainees/:cef
-// @access  Public
-export const updateTrainee = asyncHandler(async (req, res) => {
-  const trainee = await Trainee.findOne({ cef: req.params.cef });
+// @desc    Get trainee by ID
+// @route   GET /api/trainees/:id
+// @access  Private
+export const getTraineeById = asyncHandler(async (req, res) => {
+  const trainee = await Trainee.findById(req.params.id);
 
   if (!trainee) {
     return res.status(404).json({
@@ -162,23 +88,43 @@ export const updateTrainee = asyncHandler(async (req, res) => {
     });
   }
 
-  const { cef, name, first_name, groupe } = req.body;
+  res.json({
+    success: true,
+    data: trainee,
+  });
+});
 
-  if (cef) trainee.cef = cef;
-  if (name) trainee.name = name;
-  if (first_name) trainee.firstName = first_name;
-  if (groupe) trainee.groupe = groupe;
+// @desc    Update trainee
+// @route   PUT /api/trainees/:id
+// @access  Private (SG/Admin)
+export const updateTrainee = asyncHandler(async (req, res) => {
+  const trainee = await Trainee.findById(req.params.id);
 
-  await trainee.save();
+  if (!trainee) {
+    return res.status(404).json({
+      success: false,
+      message: 'Trainee not found',
+    });
+  }
 
-  res.json(trainee);
+  const updatedTrainee = await Trainee.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true, runValidators: true }
+  );
+
+  res.json({
+    success: true,
+    data: updatedTrainee,
+    message: 'Trainee updated successfully',
+  });
 });
 
 // @desc    Delete trainee
-// @route   DELETE /api/trainees/:cef
-// @access  Public
+// @route   DELETE /api/trainees/:id
+// @access  Private (SG/Admin)
 export const deleteTrainee = asyncHandler(async (req, res) => {
-  const trainee = await Trainee.findOne({ cef: req.params.cef });
+  const trainee = await Trainee.findById(req.params.id);
 
   if (!trainee) {
     return res.status(404).json({
@@ -189,187 +135,133 @@ export const deleteTrainee = asyncHandler(async (req, res) => {
 
   await trainee.deleteOne();
 
-  res.status(204).send();
+  res.json({
+    success: true,
+    message: 'Trainee deleted successfully',
+  });
+});
+
+import Group from '../models/Group.js';
+
+// @desc    Import trainees from JSON (converted from Excel on frontend)
+// @route   POST /api/trainees/import
+// @access  Private (SG/Admin)
+export const importTrainees = asyncHandler(async (req, res) => {
+  const { trainees } = req.body; // Array of trainee objects
+
+  if (!trainees || !Array.isArray(trainees) || trainees.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'No trainees data provided',
+    });
+  }
+
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: [],
+  };
+
+  const groupsToSync = new Set();
+
+  for (const t of trainees) {
+    try {
+      if (t.groupe) groupsToSync.add(t.groupe);
+
+      // Check if exists
+      const exists = await Trainee.findOne({ cef: t.cef });
+      if (exists) {
+        // Option: Update or Skip. Here we skip.
+        results.failed++;
+        results.errors.push(`Trainee with CEF ${t.cef} already exists`);
+        continue;
+      }
+
+      await Trainee.create({
+        cef: t.cef,
+        name: t.name,
+        firstName: t.firstName,
+        groupe: t.groupe,
+        phone: t.phone,
+      });
+      results.success++;
+    } catch (error) {
+      results.failed++;
+      results.errors.push(`Error importing ${t.cef}: ${error.message}`);
+    }
+  }
+
+  // Sync groups
+  for (const groupName of groupsToSync) {
+    try {
+      await Group.findOneAndUpdate(
+        { name: groupName },
+        { name: groupName },
+        { upsert: true, new: true }
+      );
+    } catch (err) {
+      console.error(`Error syncing group ${groupName}:`, err);
+    }
+  }
+
+  res.json({
+    success: true,
+    message: `Import completed. Success: ${results.success}, Failed: ${results.failed}`,
+    results,
+  });
+});
+
+// @desc    Get all trainees with calculated stats
+// @route   GET /api/trainees/with-stats
+// @access  Private (SG/Admin)
+export const getTraineesWithStats = asyncHandler(async (req, res) => {
+  const trainees = await Trainee.find().sort({ groupe: 1, name: 1 });
+  
+  // Calculate stats for each trainee
+  // Note: This might be slow for large datasets. 
+  // Optimization: Use aggregation pipeline or store stats in Trainee model and update on absence change.
+  // For now, we use the method on the model.
+  
+  const traineesWithStats = await Promise.all(trainees.map(async (t) => {
+    const totalAbsenceHours = await t.calculateTotalAbsenceHours();
+    const disciplinaryNote = await t.calculateDisciplinaryNote();
+    
+    // Get detailed absences for frontend logic if needed, or just summary
+    // The frontend spec says it fetches "trainees list" and then "computes per-group validation".
+    // But it also says "calculateAbsenceHours... sum validated absences".
+    // If we return raw absences, the frontend can do the math.
+    // Let's attach the raw absences (validated ones) as requested by the "normalization" logic description.
+    
+    const TraineeAbsence = mongoose.model('TraineeAbsence');
+    const absences = await TraineeAbsence.find({ traineeId: t._id })
+      .populate('absenceRecordId', 'date startTime endTime subject');
+
+    return {
+      ...t.toObject(),
+      totalAbsenceHours,
+      disciplinaryNote,
+      absences, // Include all absences so frontend can filter/validate
+    };
+  }));
+
+  res.json({
+    success: true,
+    data: traineesWithStats,
+  });
 });
 
 // @desc    Delete all trainees
 // @route   DELETE /api/trainees/delete-all
-// @access  Public
+// @access  Private (Admin/SG)
 export const deleteAllTrainees = asyncHandler(async (req, res) => {
-  await TraineeAbsence.deleteMany({});
-  await Dropout.deleteMany({});
   await Trainee.deleteMany({});
-  await Group.deleteMany({});
-
+  // Also delete associated absences?
+  // Ideally yes, to maintain integrity.
+  const TraineeAbsence = mongoose.model('TraineeAbsence');
+  await TraineeAbsence.deleteMany({});
+  
   res.json({
     success: true,
-    message: 'Tous les stagiaires, groupes et leurs données associées ont été supprimés',
+    message: 'All trainees and their absences have been deleted',
   });
-});
-
-// @desc    Get trainee absences
-// @route   GET /api/trainees/:cef/absences
-// @access  Public
-export const getTraineeAbsences = asyncHandler(async (req, res) => {
-  const trainee = await Trainee.findOne({ cef: req.params.cef });
-
-  if (!trainee) {
-    return res.status(404).json({ error: 'Trainee not found' });
-  }
-
-  const absences = await TraineeAbsence.find({ traineeId: trainee._id })
-    .populate('absenceRecordId')
-    .sort({ createdAt: -1 });
-
-  const formattedAbsences = absences.map(absence => ({
-    id: absence._id,
-    status: absence.status,
-    is_justified: absence.isJustified,
-    absence_hours: absence.absenceHours,
-    date: absence.absenceRecordId?.date,
-    start_time: absence.absenceRecordId?.startTime,
-    end_time: absence.absenceRecordId?.endTime,
-    isValidated: absence.absenceRecordId?.isValidated ?? false,
-    created_at: absence.createdAt,
-  }));
-
-  res.json(formattedAbsences);
-});
-
-// @desc    Get trainee statistics
-// @route   GET /api/trainees/:cef/statistics
-// @access  Public
-export const getTraineeStatistics = asyncHandler(async (req, res) => {
-  const trainee = await Trainee.findOne({ cef: req.params.cef });
-
-  if (!trainee) {
-    return res.status(404).json({ error: 'Trainee not found' });
-  }
-
-  const totalAbsenceHours = await trainee.calculateTotalAbsenceHours();
-  const disciplinaryNote = await trainee.calculateDisciplinaryNote();
-  
-  const lateCount = await TraineeAbsence.countDocuments({
-    traineeId: trainee._id,
-    status: 'late',
-  });
-  
-  const absentCount = await TraineeAbsence.countDocuments({
-    traineeId: trainee._id,
-    status: 'absent',
-  });
-  
-  const justifiedCount = await TraineeAbsence.countDocuments({
-    traineeId: trainee._id,
-    isJustified: true,
-  });
-
-  res.json({
-    total_absence_hours: totalAbsenceHours,
-    disciplinary_note: disciplinaryNote,
-    late_count: lateCount,
-    absent_count: absentCount,
-    justified_count: justifiedCount,
-  });
-});
-
-// @desc    Bulk import trainees
-// @route   POST /api/trainees/bulk-import
-// @access  Public
-export const bulkImport = asyncHandler(async (req, res) => {
-  const { trainees } = req.body;
-
-  if (!trainees || !Array.isArray(trainees)) {
-    return res.status(400).json({
-      success: false,
-      message: 'Trainees array is required',
-    });
-  }
-
-  let importedCount = 0;
-  const errors = [];
-
-  for (const traineeData of trainees) {
-    try {
-      const existing = await Trainee.findOne({ cef: traineeData.cef });
-      
-      if (existing) {
-        await existing.updateOne({
-          name: traineeData.name,
-          firstName: traineeData.first_name,
-          groupe: traineeData.groupe,
-        });
-      } else {
-        await Trainee.create({
-          cef: traineeData.cef,
-          name: traineeData.name,
-          firstName: traineeData.first_name,
-          groupe: traineeData.groupe,
-        });
-      }
-      
-      importedCount++;
-    } catch (error) {
-      errors.push({
-        cef: traineeData.cef || 'Unknown',
-        error: error.message,
-      });
-    }
-  }
-
-  res.json({
-    success: true,
-    imported: importedCount,
-    errors,
-  });
-});
-
-// @desc    Import trainees from file
-// @route   POST /api/trainees/import
-// @access  Public
-export const importTrainees = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({
-      success: false,
-      message: 'No file uploaded',
-    });
-  }
-
-  const filePath = req.file.path;
-  const ext = path.extname(req.file.originalname).toLowerCase();
-
-  try {
-    let result;
-    
-    if (ext === '.xlsx' || ext === '.xls') {
-      result = await importFromExcel(filePath);
-    } else if (ext === '.csv') {
-      result = await importFromCSV(filePath);
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Unsupported file type',
-      });
-    }
-
-    const { trainees, errors } = result;
-    const saveResult = await saveTrainees(trainees);
-
-    // Clean up uploaded file
-    fs.unlinkSync(filePath);
-
-    res.json({
-      success: true,
-      imported: saveResult.imported,
-      errors: [...errors, ...saveResult.errors],
-      message: `${saveResult.imported} stagiaires importés`,
-    });
-  } catch (error) {
-    // Clean up uploaded file
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    
-    throw error;
-  }
 });
