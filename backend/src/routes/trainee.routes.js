@@ -8,6 +8,7 @@ import {
   importTrainees,
   getTraineesWithStats,
   deleteAllTrainees,
+  getTraineeAbsences,
 } from '../controllers/traineeController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -29,5 +30,7 @@ router
   .get(getTraineeById)
   .put(authorize('sg', 'admin'), updateTrainee)
   .delete(authorize('sg', 'admin'), deleteTrainee);
+
+router.get('/:cef/absences', getTraineeAbsences);
 
 export default router;

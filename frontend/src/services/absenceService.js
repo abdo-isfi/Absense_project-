@@ -34,6 +34,24 @@ const absenceService = {
     });
     return response.data;
   },
+
+  // Get all absences
+  getAll: async () => {
+    const response = await api.get('/absences');
+    return response.data;
+  },
+
+  // Update trainee absence
+  updateTraineeAbsence: async (id, data) => {
+    const response = await api.patch(`/trainee-absences/${id}`, data);
+    return response.data;
+  },
+
+  // Validate displayed absences in bulk
+  validateDisplayedAbsences: async (data) => {
+    const response = await api.post('/absences/validate-bulk', data);
+    return response.data;
+  },
 };
 
 export default absenceService;

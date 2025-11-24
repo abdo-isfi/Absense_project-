@@ -265,3 +265,57 @@ export const deleteAllTrainees = asyncHandler(async (req, res) => {
     message: 'All trainees and their absences have been deleted',
   });
 });
+
+// @desc    Get all absences for a specific trainee
+// @route   GET /api/trainees/:cef/absences
+// @access  Private
+export const getTraineeAbsences = asyncHandler(async (req, res) => {
+  const { cef } = req.params;
+
+  // Find trainee by CEF
+  const trainee = await Trainee.findOne({ cef });
+  if (!trainee) {
+    return res.status(404).json({
+      success: false,
+      message: `Trainee with CEF ${cef} not found`
+    });
+  }
+
+  // Get all trainee absences
+  const TraineeAbsence = mongoose.model('TraineeAbsence');
+  const AbsenceRecord = mongoose.model('AbsenceRecord');
+  
+  const traineeAbsences = await TraineeAbsence.find({ traineeId: trainee._id })
+    .sort({ createdAt: -1 });
+
+  // Populate absence record details
+  const absencesWithDetails = await Promise.all(
+    traineeAbsences.map(async (ta) => {
+      const record = await AbsenceRecord.findById(ta.absenceRecordId)
+        .populate('groupId', 'name code')
+        .populate('teacherId', 'name firstName lastName');
+
+      return {
+        ...ta.toObject(),
+        id: ta._id,
+        date: record?.date,
+        absence_date: record?.date,
+        start_time: record?.startTime,
+        end_time: record?.endTime,
+        group: record?.groupId,
+        teacher: record?.teacherId,
+        is_validated: ta.isValidated,
+        is_justified: ta.isJustified,
+        has_billet_entree: ta.hasBilletEntree,
+        absence_hours: ta.absenceHours,
+        justification_comment: ta.justificationComment,
+      };
+    })
+  );
+
+  res.json({
+    success: true,
+    data: absencesWithDetails,
+  });
+});
+

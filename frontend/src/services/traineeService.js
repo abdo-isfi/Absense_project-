@@ -48,6 +48,12 @@ const traineeService = {
     const response = await api.delete('/trainees/delete-all');
     return response.data;
   },
+
+  // Get absences for a specific trainee by CEF
+  getAbsences: async (cef) => {
+    const response = await api.get(`/trainees/${cef}/absences`);
+    return response.data;
+  },
 };
 
 export default traineeService;

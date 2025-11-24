@@ -3,6 +3,7 @@ import TraineeAbsence from '../models/TraineeAbsence.js';
 import Trainee from '../models/Trainee.js';
 import Group from '../models/Group.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import mongoose from 'mongoose';
 import moment from 'moment';
 
 // @desc    Mark absence for a group
@@ -37,6 +38,19 @@ export const markAbsence = asyncHandler(async (req, res) => {
       success: false,
       message: 'Group ID or group name is required'
     });
+  }
+
+  // Check for existing absence record for this group and date
+  const existingRecord = await AbsenceRecord.findOne({
+    groupId: finalGroupId,
+    date: date
+  });
+
+  if (existingRecord) {
+    // Delete associated trainee absences
+    await TraineeAbsence.deleteMany({ absenceRecordId: existingRecord._id });
+    // Delete the record itself
+    await AbsenceRecord.deleteOne({ _id: existingRecord._id });
   }
 
   // Create Absence Record
@@ -117,11 +131,27 @@ export const getAbsenceStats = asyncHandler(async (req, res) => {
 // @desc    Get absences by group and date
 // @route   GET /api/absences/group/:groupId
 // @access  Private
+// @desc    Get absences by group and date
+// @route   GET /api/absences/group/:groupId
+// @access  Private
 export const getGroupAbsences = asyncHandler(async (req, res) => {
   const { groupId } = req.params;
   const { date } = req.query;
 
-  const query = { groupId };
+  // Check if groupId is a valid ObjectId, if not try to find group by name
+  let finalGroupId = groupId;
+  if (!mongoose.Types.ObjectId.isValid(groupId)) {
+    const groupDoc = await Group.findOne({ name: groupId });
+    if (!groupDoc) {
+      return res.status(404).json({
+        success: false,
+        message: `Group "${groupId}" not found`
+      });
+    }
+    finalGroupId = groupDoc._id;
+  }
+
+  const query = { groupId: finalGroupId };
   if (date) {
     query.date = date; // Exact match on date string YYYY-MM-DD
   }
@@ -130,9 +160,34 @@ export const getGroupAbsences = asyncHandler(async (req, res) => {
     .populate('teacherId', 'name firstName lastName')
     .sort({ date: -1, startTime: -1 });
 
+  // For each record, get the trainee absences
+  const recordsWithDetails = await Promise.all(
+    records.map(async (record) => {
+      const traineeAbsences = await TraineeAbsence.find({
+        absenceRecordId: record._id
+      }).populate('traineeId', 'cef CEF name NOM firstName PRENOM');
+
+      return {
+        ...record.toObject(),
+        group: record.groupId,
+        teacher: record.teacherId,
+        trainee_absences: traineeAbsences.map(ta => ({
+          ...ta.toObject(),
+          trainee: ta.traineeId,
+          id: ta._id,
+          is_validated: ta.isValidated,
+          is_justified: ta.isJustified,
+          has_billet_entree: ta.hasBilletEntree,
+          absence_hours: ta.absenceHours,
+          justification_comment: ta.justificationComment,
+        }))
+      };
+    })
+  );
+
   res.json({
     success: true,
-    data: records,
+    data: recordsWithDetails,
   });
 });
 
@@ -203,3 +258,123 @@ export const getWeeklyReport = asyncHandler(async (req, res) => {
     data: records,
   });
 });
+
+// @desc    Get all absences with trainee details
+// @route   GET /api/absences
+// @access  Private
+export const getAllAbsences = asyncHandler(async (req, res) => {
+  // Find all absence records
+  const records = await AbsenceRecord.find()
+    .populate('groupId', 'name code')
+    .populate('teacherId', 'name firstName lastName')
+    .sort({ date: -1, startTime: -1 });
+
+  // For each record, get the trainee absences
+  const recordsWithDetails = await Promise.all(
+    records.map(async (record) => {
+      const traineeAbsences = await TraineeAbsence.find({
+        absenceRecordId: record._id
+      }).populate('traineeId', 'cef CEF name NOM firstName PRENOM');
+
+      return {
+        ...record.toObject(),
+        group: record.groupId,
+        teacher: record.teacherId,
+        trainee_absences: traineeAbsences.map(ta => ({
+          ...ta.toObject(),
+          trainee: ta.traineeId,
+          id: ta._id,
+          is_validated: ta.isValidated,
+          is_justified: ta.isJustified,
+          has_billet_entree: ta.hasBilletEntree,
+          absence_hours: ta.absenceHours,
+          justification_comment: ta.justificationComment,
+        }))
+      };
+    })
+  );
+
+  res.json({
+    success: true,
+    data: recordsWithDetails,
+  });
+});
+
+// @desc    Update trainee absence
+// @route   PATCH /api/trainee-absences/:id
+// @access  Private
+export const updateTraineeAbsence = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+
+  const traineeAbsence = await TraineeAbsence.findById(id);
+  
+  if (!traineeAbsence) {
+    return res.status(404).json({
+      success: false,
+      message: 'Trainee absence not found'
+    });
+  }
+
+  // Map frontend field names to backend field names
+  if (updates.is_justified !== undefined) {
+    traineeAbsence.isJustified = updates.is_justified;
+  }
+  if (updates.is_validated !== undefined) {
+    traineeAbsence.isValidated = updates.is_validated;
+  }
+  if (updates.has_billet_entree !== undefined) {
+    traineeAbsence.hasBilletEntree = updates.has_billet_entree;
+  }
+  if (updates.justification_comment !== undefined) {
+    traineeAbsence.justificationComment = updates.justification_comment;
+  }
+  if (updates.status !== undefined) {
+    traineeAbsence.status = updates.status;
+  }
+  if (updates.absence_hours !== undefined) {
+    traineeAbsence.absenceHours = updates.absence_hours;
+  }
+
+  await traineeAbsence.save();
+
+  res.json({
+    success: true,
+    data: traineeAbsence,
+  });
+});
+
+// @desc    Validate absences in bulk
+// @route   POST /api/absences/validate-bulk
+// @access  Private (SG/Admin)
+export const validateBulkAbsences = asyncHandler(async (req, res) => {
+  const { group, date, absenceIds } = req.body;
+
+  if (!absenceIds || absenceIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'No absence IDs provided'
+    });
+  }
+
+  // Update all trainee absences
+  const result = await TraineeAbsence.updateMany(
+    { _id: { $in: absenceIds } },
+    { 
+      $set: { 
+        isValidated: true,
+        validatedBy: req.user._id,
+        validatedAt: new Date()
+      } 
+    }
+  );
+
+  res.json({
+    success: true,
+    message: `${result.modifiedCount} absences validated successfully`,
+    data: {
+      modifiedCount: result.modifiedCount
+    }
+  });
+});
+

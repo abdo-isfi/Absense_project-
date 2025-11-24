@@ -37,6 +37,8 @@ const TeacherAbsence = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [error, setError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
   const [absenceData, setAbsenceData] = useState({});
@@ -54,9 +56,14 @@ const TeacherAbsence = () => {
   useEffect(() => {
     if (selectedGroup) {
       fetchGroupTrainees();
+    }
+  }, [selectedGroup]);
+
+  useEffect(() => {
+    if (selectedGroup && absenceDate && trainees.length > 0) {
       checkForExistingAbsences();
     }
-  }, [selectedGroup, absenceDate]);
+  }, [selectedGroup, absenceDate, trainees.length]);
 
   // Check for existing absences when group or date changes
   const checkForExistingAbsences = async () => {
@@ -68,6 +75,35 @@ const TeacherAbsence = () => {
       if (response.success && response.data && response.data.length > 0) {
         setHasConflict(true);
         setExistingAbsences(response.data);
+        
+        // Populate existing statuses
+        const mostRecent = response.data[0];
+        if (mostRecent.absences && mostRecent.absences.length > 0) {
+          const statusMap = {};
+          mostRecent.absences.forEach(abs => {
+            const tId = abs.traineeId?._id || abs.traineeId;
+            if (tId) {
+              statusMap[tId] = {
+                status: abs.status,
+                isJustified: abs.isJustified || false
+              };
+            }
+          });
+          
+          setAbsenceData(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(traineeId => {
+              if (statusMap[traineeId]) {
+                updated[traineeId] = statusMap[traineeId];
+              }
+            });
+            return updated;
+          });
+          
+          // Also update start/end time if available
+          if (mostRecent.startTime) setStartTime(mostRecent.startTime);
+          if (mostRecent.endTime) setEndTime(mostRecent.endTime);
+        }
       } else {
         setHasConflict(false);
         setExistingAbsences([]);
@@ -246,19 +282,26 @@ const TeacherAbsence = () => {
       setSaving(false);
     }
   };
+  const filteredTrainees = trainees.filter(t => 
+    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    t.cef.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const getStatusButton = (traineeId, status, label, icon) => {
     const isActive = absenceData[traineeId]?.status === status;
 
     return (
       <button
-        onClick={() => handleStatusChange(traineeId, status)}
+        onClick={() => !hasConflict || isEditMode ? handleStatusChange(traineeId, status) : null}
+        disabled={hasConflict && !isEditMode}
         className={`
           flex items-center justify-center gap-1 px-3 py-2 rounded-lg border transition-all
+          ${hasConflict && !isEditMode ? 'opacity-50 cursor-not-allowed' : ''}
           ${isActive 
             ? status === 'present' ? 'bg-green-500 text-white border-green-600 shadow-sm' 
             : status === 'absent' ? 'bg-red-500 text-white border-red-600 shadow-sm'
-            : 'bg-primary-500 text-white border-primary-600 shadow-sm'
+            : 'bg-orange-500 text-white border-orange-600 shadow-sm'
             : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50'
           }
         `}
@@ -338,8 +381,8 @@ const TeacherAbsence = () => {
             label="Date"
             type="date"
             value={absenceDate}
-            onChange={(e) => setAbsenceDate(e.target.value)}
-            required
+            disabled
+            className="bg-gray-100 cursor-not-allowed"
           />
           <Select
             label="Heure de début"
@@ -349,6 +392,7 @@ const TeacherAbsence = () => {
             onChange={handleStartTimeChange}
             error={validationErrors.start ? 'Heure de début requise' : ''}
             required
+            disabled={hasConflict && !isEditMode}
           />
           <Select
             label="Heure de fin"
@@ -358,6 +402,7 @@ const TeacherAbsence = () => {
             onChange={(val) => setEndTime(val)}
             error={validationErrors.end ? 'Heure de fin requise' : ''}
             required
+            disabled={hasConflict && !isEditMode}
           />
         </div>
       </Card>
@@ -368,22 +413,35 @@ const TeacherAbsence = () => {
       ) : selectedGroup ? (
         <Card>
           <div className="space-y-4">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                Liste des stagiaires ({trainees.length})
+                Liste des stagiaires ({filteredTrainees.length})
               </h2>
-              <Button 
-                variant="primary" 
-                onClick={handleSubmit}
-                loading={saving}
-                disabled={!selectedGroup || !startTime || !endTime || (hasConflict && !isEditMode)}
-              >
-                {isEditMode ? 'Mettre à jour les absences' : 'Enregistrer les absences'}
-              </Button>
+              
+              <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Rechercher un stagiaire..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <Button 
+                  variant="primary" 
+                  onClick={handleSubmit}
+                  loading={saving}
+                  disabled={!selectedGroup || !startTime || !endTime || (hasConflict && !isEditMode)}
+                >
+                  {isEditMode ? 'Mettre à jour' : 'Enregistrer'}
+                </Button>
+              </div>
             </div>
 
-            {trainees.length === 0 ? (
-              <Alert type="info">Aucun stagiaire trouvé dans ce groupe</Alert>
+            {filteredTrainees.length === 0 ? (
+              <Alert type="info">Aucun stagiaire trouvé</Alert>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -401,7 +459,7 @@ const TeacherAbsence = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {trainees.map((trainee) => (
+                    {filteredTrainees.map((trainee) => (
                       <tr key={trainee._id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-medium text-gray-900">
