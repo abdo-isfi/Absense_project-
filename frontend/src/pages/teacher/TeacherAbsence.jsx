@@ -382,7 +382,7 @@ const TeacherAbsence = () => {
             type="date"
             value={absenceDate}
             disabled
-            className="bg-gray-100 cursor-not-allowed"
+            className="bg-white cursor-notb-allowed"
           />
           <Select
             label="Heure de début"
@@ -393,6 +393,7 @@ const TeacherAbsence = () => {
             error={validationErrors.start ? 'Heure de début requise' : ''}
             required
             disabled={hasConflict && !isEditMode}
+            className="bg-white"
           />
           <Select
             label="Heure de fin"
@@ -403,6 +404,7 @@ const TeacherAbsence = () => {
             error={validationErrors.end ? 'Heure de fin requise' : ''}
             required
             disabled={hasConflict && !isEditMode}
+            className="bg-white"
           />
         </div>
       </Card>
@@ -425,7 +427,7 @@ const TeacherAbsence = () => {
                     placeholder="Rechercher un stagiaire..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full sm:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
                   />
                 </div>
                 

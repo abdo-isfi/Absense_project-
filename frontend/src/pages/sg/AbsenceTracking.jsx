@@ -315,71 +315,115 @@ const AbsenceTracking = () => {
   };
 
   const filterAbsences = () => {
-    let filtered = flattenedAbsences;
-
     if (!filterGroup) {
       return [];
     }
 
-    filtered = filtered.filter((absence) => absence && absence.groupe === filterGroup);
+    // Get all trainees for the selected group
+    const groupTrainees = trainees.filter(t => t.groupe === filterGroup);
 
-    if (filterDate) {
-      filtered = filtered.filter((absence) => absence && absence.date === filterDate);
+    // If no date is selected, we can't show "present" status meaningfully for a specific day
+    // So we fall back to showing recent absences or just the list of trainees
+    if (!filterDate) {
+      // Show all trainees for the selected group with present status if no absence record
+      const combinedNoDate = groupTrainees.map(trainee => {
+        const cef = trainee.cef || trainee.CEF;
+        // Find most recent absence for this trainee in the selected group
+        const recentAbsence = flattenedAbsences
+          .filter(a => a.groupe === filterGroup && (a.cef === cef))
+          .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+        if (recentAbsence) {
+          return recentAbsence;
+        }
+        // No absence record, create a present placeholder
+        return {
+          id: `temp_${cef}_present`,
+          trainee_id: trainee._id,
+          cef,
+          trainee_name: trainee.name || trainee.NOM || '',
+          trainee_first_name: trainee.first_name || trainee.PRENOM || '',
+          groupe: filterGroup,
+          date: '',
+          status: 'present',
+          is_validated: true,
+          is_justified: false,
+          absence_hours: 0,
+          start_time: '',
+          end_time: '',
+          teacher_name: ''
+        };
+      });
+      return combinedNoDate;
     }
 
+    // DATE SELECTED: Show ALL trainees for that group on that date
+    const recordsForDate = flattenedAbsences.filter(
+      (absence) => absence.groupe === filterGroup && absence.date === filterDate
+    );
+
+    // Create a map of absences for quick lookup
+    const absenceMap = {};
+    recordsForDate.forEach(record => {
+      if (record.cef) {
+        absenceMap[record.cef] = record;
+      }
+    });
+
+    // Merge trainees with absences
+    let combinedRecords = groupTrainees.map(trainee => {
+      const absenceRecord = absenceMap[trainee.cef];
+      
+      if (absenceRecord) {
+        return absenceRecord;
+      }
+
+      // Create a "Present" record for trainees without absence
+        return {
+          id: `temp_${trainee._id}_${filterDate}`,
+          trainee_id: trainee._id,
+          cef: trainee.cef || trainee.CEF,
+          trainee_name: trainee.name || trainee.NOM || '',
+          trainee_first_name: trainee.firstName || trainee.first_name || trainee.PRENOM || '',
+          groupe: filterGroup,
+          date: filterDate,
+          status: 'present',
+          is_validated: true,
+          is_justified: false,
+          absence_hours: 0,
+          start_time: '',
+          end_time: '',
+          teacher_name: ''
+        };
+    });
+
+    // Apply secondary filters (Status, Justification, Search)
     if (statusFilter !== 'all') {
-      filtered = filtered.filter((absence) => absence && absence.status === statusFilter);
+      combinedRecords = combinedRecords.filter(r => r.status === statusFilter);
     }
 
     if (justifiedFilter !== 'all') {
       if (justifiedFilter === 'justified') {
-        filtered = filtered.filter((absence) => absence && absence.is_justified === true);
+        combinedRecords = combinedRecords.filter(r => r.is_justified === true);
       } else if (justifiedFilter === 'not_justified') {
-        filtered = filtered.filter(
-          (absence) => absence && (absence.is_justified === false || absence.is_justified === undefined)
-        );
+        combinedRecords = combinedRecords.filter(r => r.is_justified === false && r.status !== 'present');
       }
     }
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter((absence) => {
-        if (!absence) return false;
-        const trainee = getTraineeData(absence.cef);
-
+      combinedRecords = combinedRecords.filter(r => {
+        const name = r.trainee_name || r.name || '';
+        const firstName = r.trainee_first_name || r.firstName || '';
+        const cef = r.cef || '';
         return (
-          (trainee.name && trainee.name.toLowerCase().includes(term)) ||
-          (trainee.first_name && trainee.first_name.toLowerCase().includes(term)) ||
-          (absence.cef && absence.cef.toString().toLowerCase().includes(term))
+          name.toLowerCase().includes(term) ||
+          firstName.toLowerCase().includes(term) ||
+          cef.toString().toLowerCase().includes(term)
         );
       });
     }
 
-    // Deduplication logic
-    if (!filterDate) {
-      // Show most recent absence per trainee
-      const traineeAbsences = {};
-      filtered.forEach((absence) => {
-        if (!absence) return;
-        if (!traineeAbsences[absence.cef] || new Date(absence.date) > new Date(traineeAbsences[absence.cef].date)) {
-          traineeAbsences[absence.cef] = absence;
-        }
-      });
-      filtered = Object.values(traineeAbsences);
-    } else {
-      // Show all absences for specific date (deduplicate by cef_date_status)
-      const uniqueMap = new Map();
-      filtered.forEach((absence) => {
-        if (!absence) return;
-        const key = `${absence.cef}_${absence.date}_${absence.status}`;
-        if (!uniqueMap.has(key)) {
-          uniqueMap.set(key, absence);
-        }
-      });
-      filtered = Array.from(uniqueMap.values());
-    }
-
-    return filtered;
+    return combinedRecords;
   };
 
   const getAbsenceStats = () => {

@@ -13,7 +13,8 @@ const Select = ({
   error,
   required = false,
   className,
-  containerClassName
+  containerClassName,
+  disabled = false
 }) => {
   const selectedOption = options.find(opt => opt.value === value);
 
@@ -26,7 +27,7 @@ const Select = ({
         </label>
       )}
       
-      <Listbox value={value} onChange={onChange}>
+      <Listbox value={value} onChange={onChange} disabled={disabled}>
         <div className="relative">
           <Listbox.Button className={cn(
             'relative w-full cursor-pointer rounded-lg border bg-white py-2.5 pl-4 pr-10 text-left transition-colors',
