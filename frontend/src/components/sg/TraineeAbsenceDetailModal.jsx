@@ -37,25 +37,35 @@ const TraineeAbsenceDetailModal = ({ show, selectedTrainee, traineeAbsences, han
     >
       <div className="space-y-6">
         {/* Trainee Info */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
-          <h3 className="text-xl font-bold text-gray-900 mb-3">
-            {selectedTrainee.name} {selectedTrainee.first_name}
-          </h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="font-semibold text-gray-700">CEF:</span>{' '}
-              <span className="text-gray-900">{selectedTrainee.cef}</span>
-            </div>
-            <div>
-              <span className="font-semibold text-gray-700">Groupe:</span>{' '}
-              <span className="text-gray-900">{selectedTrainee.class || selectedTrainee.groupe || 'N/A'}</span>
-            </div>
+        {/* Trainee Info */}
+        <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium mb-1">CEF:</span>
+            <span className="text-gray-900 font-semibold">{selectedTrainee.cef}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium mb-1">Étudiant:</span>
+            <span className="text-gray-900 font-semibold">
+              {selectedTrainee.name} {selectedTrainee.first_name}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium mb-1">Groupe:</span>
+            <span className="text-gray-900 font-semibold">
+              {selectedTrainee.class || selectedTrainee.groupe || 'N/A'}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium mb-1">Total Absences:</span>
+            <span className="text-gray-900 font-semibold">
+              {selectedTrainee.absenceCounts?.absent || 0} (Validées)
+            </span>
           </div>
         </div>
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white border-2 border-red-200 rounded-lg p-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <div className="text-sm font-semibold text-gray-600 mb-1">Total Absences</div>
             <div className="text-3xl font-bold text-red-600">
               {selectedTrainee.absenceCounts?.absent || 0}
@@ -63,7 +73,7 @@ const TraineeAbsenceDetailModal = ({ show, selectedTrainee, traineeAbsences, han
             <div className="text-xs text-gray-500 mt-1">Validées uniquement</div>
           </div>
 
-          <div className="bg-white border-2 border-amber-200 rounded-lg p-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <div className="text-sm font-semibold text-gray-600 mb-1">Total Retards</div>
             <div className="text-3xl font-bold text-amber-600">
               {selectedTrainee.absenceCounts?.late || 0}
@@ -71,7 +81,7 @@ const TraineeAbsenceDetailModal = ({ show, selectedTrainee, traineeAbsences, han
             <div className="text-xs text-gray-500 mt-1">Validées uniquement</div>
           </div>
 
-          <div className="bg-white border-2 border-blue-200 rounded-lg p-4">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <div className="text-sm font-semibold text-gray-600 mb-1">Heures d'absence</div>
             <div className="text-3xl font-bold text-blue-600">
               {selectedTrainee.absenceHours || 0}h
@@ -81,7 +91,7 @@ const TraineeAbsenceDetailModal = ({ show, selectedTrainee, traineeAbsences, han
         </div>
 
         {/* Disciplinary Status */}
-        <div className="bg-white border-2 rounded-lg p-4">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-semibold text-gray-600 mb-1">Statut Disciplinaire</div>

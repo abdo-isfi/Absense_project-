@@ -8,6 +8,7 @@ import TeacherSchedule from './pages/teacher/TeacherSchedule';
 import TeacherAbsence from './pages/teacher/TeacherAbsence';
 import SGDashboard from './pages/sg/SGDashboard';
 import ManageTrainees from './pages/sg/ManageTrainees';
+import TraineesList from './pages/sg/TraineesList';
 import ManageTeachers from './pages/sg/ManageTeachers';
 import AbsenceTracking from './pages/sg/AbsenceTracking';
 import ExportPage from './pages/sg/ExportPage';
@@ -68,6 +69,14 @@ function App() {
             <ProtectedRoute allowedRoles={[USER_ROLES.SG]}>
               <DashboardLayout>
                 <ManageTrainees />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path={ROUTES.SG.TRAINEES_LIST} element={
+            <ProtectedRoute allowedRoles={[USER_ROLES.SG]}>
+              <DashboardLayout>
+                <TraineesList />
               </DashboardLayout>
             </ProtectedRoute>
           } />

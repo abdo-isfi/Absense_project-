@@ -26,7 +26,7 @@ const LoginPage = () => {
   const [passwordError, setPasswordError] = useState('');
 
   const navigate = useNavigate();
-  const { login, isAuthenticated, userRole, user } = useAuthContext();
+  const { login, logout, isAuthenticated, userRole, user } = useAuthContext();
 
   // Load remembered email
   useEffect(() => {
@@ -36,13 +36,6 @@ const LoginPage = () => {
       setRememberMe(true);
     }
   }, []);
-
-  // Redirect if already authenticated and no password change required
-  useEffect(() => {
-    if (isAuthenticated && userRole && !user?.must_change_password) {
-      redirectByRole(userRole);
-    }
-  }, [isAuthenticated, userRole, user]);
 
   const redirectByRole = (role) => {
     if (role === 'teacher') navigate(ROUTES.TEACHER.DASHBOARD);
@@ -73,7 +66,7 @@ const LoginPage = () => {
       }
 
       // Redirect based on role
-      // redirectByRole(data.user.role); // Let useEffect handle it
+      redirectByRole(data.user.role);
     } catch (err) {
       setError(handleApiError(err));
     } finally {
@@ -103,8 +96,60 @@ const LoginPage = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    // Clear local state if needed
+    setEmail('');
+    setPassword('');
+  };
+
   if (loading) {
     return <Loader fullScreen text="Connexion en cours..." />;
+  }
+
+  // If authenticated, show welcome back screen instead of login form
+  if (isAuthenticated && user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 text-center">
+            <div className="mb-6">
+              <div className="h-20 w-20 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl font-bold text-primary-600">
+                  {user.prenom?.[0]}{user.nom?.[0]}
+                </span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Bon retour, {user.prenom} !
+              </h2>
+              <p className="text-gray-600">
+                Vous êtes déjà connecté en tant que <span className="font-medium text-primary-600">{user.role}</span>
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                onClick={() => redirectByRole(user.role)}
+              >
+                Accéder au tableau de bord
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={handleLogout}
+              >
+                Se déconnecter
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -116,7 +161,7 @@ const LoginPage = () => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-primary-600 mb-2">
               ISTA NTIC
-            </h1>Email
+            </h1>
             <p className="text-gray-600">
               Système de Gestion des Absences
             </p>

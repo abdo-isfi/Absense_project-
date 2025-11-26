@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   PlusIcon, 
   ArrowUpTrayIcon, 
@@ -21,6 +21,7 @@ import Modal from '../../components/ui/Modal';
 import Alert from '../../components/ui/Alert';
 import Loader from '../../components/ui/Loader';
 import Badge from '../../components/ui/Badge';
+import AbsenceCalendar from '../../components/ui/AbsenceCalendar';
 import traineeService from '../../services/traineeService';
 import groupService from '../../services/groupService';
 import absenceService from '../../services/absenceService';
@@ -71,63 +72,174 @@ const getTraineeStatus = (hours) => {
 // --- Components ---
 
 const TraineeAbsenceDetailModal = ({ isOpen, onClose, trainee, absences }) => {
+  const [showAbsenceTable, setShowAbsenceTable] = React.useState(false);
+  
   if (!isOpen || !trainee) return null;
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Détails: ${trainee.name} ${trainee.firstName}`} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="📊 Détails du Stagiaire" size="xl">
       <div className="space-y-4">
-        <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
-          <div>
-            <p className="text-sm text-gray-500">Total Heures (Validées)</p>
-            <p className="text-2xl font-bold">{trainee.totalAbsenceHours} h</p>
+        {/* Trainee Info Grid - Compact */}
+        <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm bg-gray-50 p-3 rounded-lg border border-gray-200">
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium text-xs mb-0.5">CEF:</span>
+            <span className="text-gray-900 font-semibold">{trainee.cef}</span>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Statut</p>
-            <span className={`px-2 py-1 rounded text-sm font-medium ${trainee.disciplinaryStatus?.color}`}>
-              {trainee.disciplinaryStatus?.text}
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium text-xs mb-0.5">Nom:</span>
+            <span className="text-gray-900 font-semibold">{trainee.name}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium text-xs mb-0.5">Prénom:</span>
+            <span className="text-gray-900 font-semibold">{trainee.firstName}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium text-xs mb-0.5">Groupe:</span>
+            <span className="text-gray-900 font-semibold">{trainee.groupe || '-'}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium text-xs mb-0.5">Téléphone:</span>
+            <span className="text-gray-900 font-semibold">{trainee.phone || 'N/A'}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500 font-medium text-xs mb-0.5">État Disciplinaire:</span>
+            <span 
+              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white w-fit mt-0.5"
+              style={{ 
+                backgroundColor: 
+                  trainee.disciplinaryStatus?.text?.includes('EXCL') ? '#e74c3c' : 
+                  trainee.disciplinaryStatus?.text?.includes('SUSP') || trainee.disciplinaryStatus?.text?.includes('BLÂME') ? '#f39c12' : 
+                  trainee.disciplinaryStatus?.text?.includes('MISE') ? '#f39c12' :
+                  trainee.disciplinaryStatus?.text?.includes('AVERT') ? '#3498db' :
+                  '#27ae60' 
+              }}
+            >
+              {trainee.disciplinaryStatus?.text || 'NORMAL'}
             </span>
           </div>
         </div>
 
-        <h4 className="font-medium text-gray-900">Historique des absences</h4>
-        <div className="max-h-60 overflow-y-auto border rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Heure</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Statut</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Justifié</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {absences.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-4 py-4 text-center text-gray-500">Aucune absence enregistrée</td>
-                </tr>
-              ) : (
-                absences.map((abs, i) => (
-                  <tr key={i}>
-                    <td className="px-4 py-2 text-sm">
-                      {abs.absenceRecordId?.date ? new Date(abs.absenceRecordId.date).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="px-4 py-2 text-sm">
-                      {abs.absenceRecordId?.startTime || '-'} - {abs.absenceRecordId?.endTime || '-'}
-                    </td>
-                    <td className="px-4 py-2 text-sm capitalize">{abs.status}</td>
-                    <td className="px-4 py-2 text-sm">
-                      {abs.isJustified ? <CheckCircleIcon className="h-5 w-5 text-green-500" /> : <XCircleIcon className="h-5 w-5 text-red-500" />}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Statistics Section - Compact */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">📈 Statistiques</h4>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-2.5">
+              <div className="text-xs font-medium text-gray-600 mb-0.5">Absences</div>
+              <div className="text-xl font-bold text-red-600">
+                {trainee.absenceCounts?.absent || 0}
+              </div>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+              <div className="text-xs font-medium text-gray-600 mb-0.5">Retards</div>
+              <div className="text-xl font-bold text-amber-600">
+                {trainee.absenceCounts?.late || 0}
+              </div>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
+              <div className="text-xs font-medium text-gray-600 mb-0.5">Heures</div>
+              <div className="text-xl font-bold text-blue-600">
+                {trainee.absenceHours?.toFixed(1) || 0}h
+              </div>
+            </div>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5">
+              <div className="text-xs font-medium text-gray-600 mb-0.5">Note</div>
+              <div className="text-xl font-bold text-purple-600">
+                {trainee.disciplinaryNote || 20}/20
+              </div>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>Fermer</Button>
+
+        {/* Absence Calendar - Compact */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">📅 Calendrier</h4>
+          {trainee.absenceCalendar && Object.keys(trainee.absenceCalendar).length > 0 ? (
+            <AbsenceCalendar attendanceData={trainee.absenceCalendar} />
+          ) : (
+            <div className="text-center text-gray-500 text-sm italic p-6 bg-gray-50 rounded-lg border border-gray-200">
+              Aucune donnée d'absence disponible
+            </div>
+          )}
         </div>
+
+        {/* Absence History Table - Collapsible */}
+        {Array.isArray(absences) && absences.length > 0 && (
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-sm font-semibold text-gray-900">📋 Détail des Absences ({absences.filter(abs => abs.status === 'absent' || abs.status === 'late').length})</h4>
+              <Button 
+                variant="secondary" 
+                size="sm"
+                onClick={() => setShowAbsenceTable(prev => !prev)}
+              >
+                {showAbsenceTable ? 'Masquer' : 'Afficher'}
+              </Button>
+            </div>
+            
+            {showAbsenceTable && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="max-h-64 overflow-y-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                        <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Justifié</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Heures</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {absences
+                        .filter(abs => abs.status === 'absent' || abs.status === 'late')
+                        .map((abs, i) => (
+                          <tr key={i} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-3 py-2 text-sm text-gray-900 font-medium">
+                              {formatDate(abs.absenceRecordId?.date || abs.date)}
+                            </td>
+                            <td className="px-3 py-2 text-sm">
+                              <span 
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                                style={{ 
+                                  backgroundColor: abs.status === 'absent' ? '#e74c3c' : '#f39c12'
+                                }}
+                              >
+                                {abs.status === 'absent' ? 'Absent' : 'Retard'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-sm text-center">
+                              {abs.isJustified || abs.is_justified ? (
+                                <span className="text-green-600 font-bold">✓</span>
+                              ) : (
+                                <span className="text-red-600 font-bold">✗</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-sm font-semibold text-gray-900 text-right">
+                              {abs.absenceHours || abs.absence_hours || 0}h
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-gray-200">
+        <Button variant="secondary" onClick={onClose}>
+          Fermer
+        </Button>
       </div>
     </Modal>
   );
@@ -402,7 +514,55 @@ const ManageTrainees = () => {
   };
 
   const openDetailsModal = (trainee) => {
-    setSelectedTrainee(trainee);
+    // Calculate absence counts
+    const absences = trainee.absences || [];
+    const absenceCounts = {
+      absent: absences.filter(a => a.status === 'absent' && (a.isValidated || a.is_validated)).length,
+      late: absences.filter(a => a.status === 'late' && (a.isValidated || a.is_validated)).length
+    };
+    
+    // Calculate disciplinary note (20 - points lost)
+    const validatedAbsences = absences.filter(a => a.isValidated || a.is_validated);
+    let absenceHours = 0;
+    let lateCount = 0;
+    
+    validatedAbsences.forEach(abs => {
+      if (abs.status === 'absent' && !(abs.isJustified || abs.is_justified)) {
+        absenceHours += Number(abs.absenceHours || abs.absence_hours || 0);
+      } else if (abs.status === 'late') {
+        lateCount++;
+      }
+    });
+    
+    const absencePoints = Math.floor(absenceHours / 5);
+    const latePoints = Math.floor(lateCount / 4);
+    const disciplinaryNote = Math.max(0, 20 - absencePoints - latePoints);
+    
+    // Prepare calendar data: { "2025-11-26": "absent", "2025-11-25": "late", ... }
+    const absenceCalendar = {};
+    validatedAbsences.forEach(abs => {
+      const date = abs.absenceRecordId?.date || abs.date;
+      if (date) {
+        // Format date as YYYY-MM-DD
+        const dateKey = new Date(date).toISOString().split('T')[0];
+        // Determine status for calendar
+        if (abs.isJustified || abs.is_justified) {
+          absenceCalendar[dateKey] = 'justified';
+        } else if (abs.status === 'absent') {
+          absenceCalendar[dateKey] = 'absent';
+        } else if (abs.status === 'late') {
+          absenceCalendar[dateKey] = 'late';
+        }
+      }
+    });
+    
+    setSelectedTrainee({
+      ...trainee,
+      absenceCounts,
+      absenceHours: trainee.totalAbsenceHours,
+      disciplinaryNote,
+      absenceCalendar
+    });
     setTraineeAbsences(trainee.absences || []);
     setShowDetailsModal(true);
   };
@@ -416,32 +576,29 @@ const ManageTrainees = () => {
     { 
       header: 'Heures', 
       accessor: 'totalAbsenceHours',
-      render: (t) => <span className="font-bold">{t.totalAbsenceHours} h</span>
+      render: (hours) => <span className="font-bold">{hours} h</span>
     },
     { 
       header: 'Statut', 
       accessor: 'disciplinaryStatus',
-      render: (t) => (
-        <span className={`px-2 py-1 rounded text-xs font-medium ${t.disciplinaryStatus?.color}`}>
-          {t.disciplinaryStatus?.text}
+      render: (status) => (
+        <span className={`px-2 py-1 rounded text-xs font-medium ${status?.color}`}>
+          {status?.text}
         </span>
       )
     },
     { 
       header: 'Actions', 
       accessor: 'actions', 
-      render: (trainee) => (
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => openDetailsModal(trainee)} title="Détails">
-            <MagnifyingGlassIcon className="h-5 w-5 text-gray-600" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setSelectedTrainee(trainee); setFormData(trainee); setShowEditModal(true); }} title="Modifier">
-            <PencilSquareIcon className="h-5 w-5 text-blue-600" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setSelectedTrainee(trainee); setShowDeleteModal(true); }} title="Supprimer">
-            <TrashIcon className="h-5 w-5 text-red-600" />
-          </Button>
-        </div>
+      render: (_, trainee) => (
+        <Button 
+          variant="secondary" 
+          size="sm" 
+          onClick={() => openDetailsModal(trainee)}
+        >
+          <MagnifyingGlassIcon className="h-4 w-4 mr-1" />
+          Détails
+        </Button>
       )
     },
   ];
@@ -465,10 +622,6 @@ const ManageTrainees = () => {
           <Button variant="secondary" onClick={() => setShowImportModal(true)} className="flex items-center gap-2">
             <ArrowUpTrayIcon className="h-5 w-5" />
             Importer Excel
-          </Button>
-          <Button variant="primary" onClick={() => { resetForm(); setShowAddModal(true); }} className="flex items-center gap-2">
-            <PlusIcon className="h-5 w-5" />
-            Ajouter
           </Button>
         </div>
       </div>

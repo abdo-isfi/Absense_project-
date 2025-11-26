@@ -199,6 +199,7 @@ const AbsenceTracking = () => {
         if (record.trainee_absences && Array.isArray(record.trainee_absences)) {
           record.trainee_absences.forEach((traineeAbsence) => {
             if (!traineeAbsence) return;
+            
             const processedAbsence = {
               id: traineeAbsence.id,
               trainee_id: traineeAbsence.trainee_id,
@@ -208,18 +209,25 @@ const AbsenceTracking = () => {
               is_justified: traineeAbsence.is_justified || false,
               has_billet_entree: traineeAbsence.has_billet_entree || false,
               absence_hours: traineeAbsence.absence_hours || 0,
+              justification_comment: traineeAbsence.justification_comment || '',
               date: record.date,
-              start_time: record.start_time,
-              end_time: record.end_time,
-              group_id: record.group_id,
-              teacher_id: record.teacher_id,
+              start_time: record.startTime || record.start_time,
+              end_time: record.endTime || record.end_time,
+              group_id: record.groupId || record.group_id,
+              teacher_id: record.teacherId || record.teacher_id,
               cef: traineeAbsence.trainee?.cef || traineeAbsence.trainee?.CEF,
               trainee_name: traineeAbsence.trainee?.name || traineeAbsence.trainee?.NOM,
-              trainee_first_name: traineeAbsence.trainee?.first_name || traineeAbsence.trainee?.PRENOM,
-              groupe: record.group?.name || record.group?.code || '',
-              teacher_name: record.teacher?.first_name && record.teacher?.last_name
+              trainee_first_name: traineeAbsence.trainee?.firstName || traineeAbsence.trainee?.first_name || traineeAbsence.trainee?.PRENOM,
+              groupe: record.group?.name || record.groupId?.name || record.group?.code || '',
+              teacher_name: record.teacher?.firstName && record.teacher?.lastName
+                ? `${record.teacher.firstName} ${record.teacher.lastName}`
+                : record.teacherId?.firstName && record.teacherId?.lastName
+                ? `${record.teacherId.firstName} ${record.teacherId.lastName}`
+                : record.teacher?.first_name && record.teacher?.last_name
                 ? `${record.teacher.first_name} ${record.teacher.last_name}`
-                : record.teacher?.name || 'Non assigné',
+                : record.teacherId?.first_name && record.teacherId?.last_name
+                ? `${record.teacherId.first_name} ${record.teacherId.last_name}`
+                : record.teacher?.name || record.teacherId?.name || 'Non assigné',
             };
             flattened.push(processedAbsence);
           });
@@ -749,7 +757,18 @@ const AbsenceTracking = () => {
     setShowBulkConfirmation(false);
 
     try {
-      const absenceIds = filteredRecords.map((absence) => absence.id);
+      // Filter out temporary IDs (for present trainees) - only send real MongoDB IDs
+      const absenceIds = filteredRecords
+        .map((absence) => absence.id)
+        .filter((id) => !id.startsWith('temp_')); // Exclude temporary IDs
+
+      if (absenceIds.length === 0) {
+        setError('Aucune absence à valider');
+        setTimeout(() => setError(''), 3000);
+        setBulkValidating(false);
+        setBulkConfirmationData(null);
+        return;
+      }
 
       await absenceService.validateDisplayedAbsences({
         group: bulkConfirmationData.group,
@@ -765,6 +784,9 @@ const AbsenceTracking = () => {
       await loadAbsenceData();
     } catch (error) {
       console.error('Bulk validation failed:', error);
+      console.error('Error response:', error.response);
+      console.error('Error message:', error.message);
+      console.error('Request URL:', error.config?.url);
       setError('Erreur lors de la validation en bloc');
       setTimeout(() => setError(''), 3000);
     } finally {
@@ -1213,7 +1235,7 @@ const AbsenceTracking = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-center font-semibold text-gray-900">
-                          {absence.absence_hours || 0}h
+                          {absence.status === 'late' ? '0h' : `${absence.absence_hours || 0}h`}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <ActionButtons
