@@ -3,8 +3,9 @@ import { Dialog } from '@headlessui/react';
 import { XMarkIcon, CloudArrowUpIcon, DocumentIcon } from '@heroicons/react/24/outline';
 import Button from '../ui/Button';
 import api from '../../services/api';
+import { API_URL } from '../../utils/constants';
 
-const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave }) => {
+const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave, readOnly = false }) => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [fileType, setFileType] = useState(null);
@@ -13,17 +14,37 @@ const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave }) => {
 
   useEffect(() => {
     if (isOpen && teacher) {
-      // Check local storage for existing schedule
-      const schedules = JSON.parse(localStorage.getItem('teacherSchedules') || '{}');
-      if (schedules[teacher.id]) {
-        setPreview(schedules[teacher.id].preview);
-        setFileType(schedules[teacher.id].type);
-      } else {
-        setFile(null);
-        setPreview(null);
-        setFileType(null);
-      }
+      // Reset state
+      setFile(null);
       setError('');
+
+      if (teacher.schedulePath) {
+        // Use backend URL
+        const baseUrl = API_URL.replace('/api', '');
+        // Ensure path doesn't start with / if we append it, or handle it safely
+        // teacher.schedulePath usually is "uploads/..."
+        setPreview(`${baseUrl}/${teacher.schedulePath}`);
+        
+        const ext = teacher.schedulePath.split('.').pop().toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+          setFileType('image/' + ext);
+        } else if (ext === 'pdf') {
+          setFileType('application/pdf');
+        } else {
+          setFileType('application/octet-stream');
+        }
+      } else {
+        // Fallback to local storage for legacy/local-only data
+        const schedules = JSON.parse(localStorage.getItem('teacherSchedules') || '{}');
+        if (schedules[teacher._id] || schedules[teacher.id]) {
+          const id = teacher._id || teacher.id;
+          setPreview(schedules[id].preview);
+          setFileType(schedules[id].type);
+        } else {
+          setPreview(null);
+          setFileType(null);
+        }
+      }
     }
   }, [isOpen, teacher]);
 
@@ -58,15 +79,17 @@ const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave }) => {
       const formData = new FormData();
       formData.append('schedule', file);
       
+      const teacherId = teacher._id || teacher.id;
+
       try {
-        await api.post(`/teachers/${teacher.id}/schedule`, formData, {
+        await api.post(`/teachers/${teacherId}/schedule`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       } catch (apiError) {
         console.warn('Backend upload failed, falling back to local storage', apiError);
         // Fallback to local storage
         const schedules = JSON.parse(localStorage.getItem('teacherSchedules') || '{}');
-        schedules[teacher.id] = {
+        schedules[teacherId] = {
           preview: preview,
           type: fileType,
           updatedAt: new Date().toISOString()
@@ -74,7 +97,7 @@ const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave }) => {
         localStorage.setItem('teacherSchedules', JSON.stringify(schedules));
       }
 
-      onSave();
+      if (onSave) onSave();
       onClose();
     } catch (err) {
       setError('Erreur lors de l\'enregistrement de l\'emploi du temps');
@@ -106,51 +129,60 @@ const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave }) => {
               </div>
             )}
 
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <CloudArrowUpIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-sm text-gray-600 font-medium">
-                Cliquez ou glissez un fichier ici
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Images (PNG, JPG) ou PDF
-              </p>
-            </div>
+            {!readOnly && (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors cursor-pointer relative">
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={handleFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <CloudArrowUpIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-sm text-gray-600 font-medium">
+                  Cliquez ou glissez un fichier ici
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Images (PNG, JPG) ou PDF
+                </p>
+              </div>
+            )}
 
-            {preview && (
+            {preview ? (
               <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
                 <div className="p-2 bg-gray-100 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase">
                   Aperçu
                 </div>
                 <div className="p-4 flex justify-center">
                   {fileType?.startsWith('image/') ? (
-                    <img src={preview} alt="Schedule Preview" className="max-h-64 object-contain" />
+                    <img src={preview} alt="Schedule Preview" className="max-h-[60vh] object-contain" />
                   ) : (
                     <div className="text-center py-8">
                       <DocumentIcon className="h-16 w-16 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-900 font-medium">Document PDF</p>
-                      <a href={preview} download="schedule.pdf" className="text-primary-600 hover:underline text-sm">
-                        Télécharger pour voir
+                      <a href={preview} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline text-sm block mt-2">
+                        Ouvrir le PDF
                       </a>
                     </div>
                   )}
                 </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border border-gray-200">
+                <DocumentIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                <p>Aucun emploi du temps disponible</p>
               </div>
             )}
           </div>
 
           <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
             <Button variant="secondary" onClick={onClose}>
-              Annuler
+              Fermer
             </Button>
-            <Button variant="primary" onClick={handleSave} loading={uploading} disabled={!file && !preview}>
-              Enregistrer
-            </Button>
+            {!readOnly && (
+              <Button variant="primary" onClick={handleSave} loading={uploading} disabled={!file && !preview}>
+                Enregistrer
+              </Button>
+            )}
           </div>
         </Dialog.Panel>
       </div>

@@ -41,6 +41,14 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Static files
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.join(__dirname, '..'); // Go up one level from src
+app.use('/uploads', express.static(path.join(rootDir, 'uploads')));
+
 // HTTP Request Logging (only if not in test environment)
 if (process.env.NODE_ENV !== 'test') {
   if (process.env.NODE_ENV === 'development') {

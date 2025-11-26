@@ -89,10 +89,10 @@ const ManageTeachers = () => {
     { 
       header: 'Groupes', 
       accessor: 'groups',
-      render: (teacher) => (
+      render: (groups) => (
         <div className="flex flex-wrap gap-1">
-          {teacher.groups && teacher.groups.length > 0 ? (
-            teacher.groups.map((g, i) => (
+          {groups && groups.length > 0 ? (
+            groups.map((g, i) => (
               <Badge key={g._id || i} variant="info" size="sm">
                 {g.name || g}
               </Badge>
@@ -106,7 +106,7 @@ const ManageTeachers = () => {
     { 
       header: 'Actions', 
       accessor: 'actions', 
-      render: (teacher) => (
+      render: (_, teacher) => (
         <Button 
           variant="ghost" 
           size="sm" 
