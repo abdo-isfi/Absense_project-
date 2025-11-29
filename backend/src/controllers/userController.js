@@ -97,7 +97,7 @@ export const updateUser = async (req, res, next) => {
     user.name = name || user.name;
     user.email = email || user.email;
     user.role = role || user.role;
-    if (status) user.status = status;
+    if (req.body.isActive !== undefined) user.isActive = req.body.isActive;
 
     // If password is provided (e.g. admin reset), handle it
     if (req.body.password) {
@@ -114,7 +114,7 @@ export const updateUser = async (req, res, next) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        status: user.status,
+        isActive: user.isActive,
       },
     });
   } catch (error) {

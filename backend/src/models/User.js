@@ -26,6 +26,10 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'sg'],
     default: 'admin',
   },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
   emailVerifiedAt: {
     type: Date,
     default: null,

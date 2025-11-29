@@ -4,30 +4,46 @@ import Card from '../../components/ui/Card';
 import Alert from '../../components/ui/Alert';
 import Loader from '../../components/ui/Loader';
 import { CalendarIcon } from '@heroicons/react/24/outline';
+import teacherService from '../../services/teacherService';
+import { API_URL } from '../../utils/constants';
 
 const TeacherSchedule = () => {
   const { user } = useAuthContext();
   const [schedule, setSchedule] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Try to load schedule from localStorage first (uploaded by admin)
-    const loadSchedule = () => {
+    const fetchSchedule = async () => {
+      if (!user?.id) return;
+
       try {
-        const savedSchedule = localStorage.getItem(`teacher_schedule_${user?.id}`);
-        if (savedSchedule) {
-          setSchedule(JSON.parse(savedSchedule));
+        setLoading(true);
+        // Fetch fresh teacher data to get the schedule path
+        const teacherData = await teacherService.getById(user.id);
+        
+        if (teacherData.data.schedulePath) {
+          const baseUrl = API_URL.replace('/api', '');
+          const scheduleUrl = `${baseUrl}/${teacherData.data.schedulePath}`;
+          const isPdf = teacherData.data.schedulePath.toLowerCase().endsWith('.pdf');
+          
+          setSchedule({
+            url: scheduleUrl,
+            type: isPdf ? 'pdf' : 'image',
+            uploadedAt: teacherData.data.updatedAt
+          });
+        } else {
+          setSchedule(null);
         }
-      } catch (error) {
-        console.error('Error loading schedule:', error);
+      } catch (err) {
+        console.error('Error loading schedule:', err);
+        setError('Impossible de charger l\'emploi du temps.');
       } finally {
         setLoading(false);
       }
     };
 
-    if (user?.id) {
-      loadSchedule();
-    }
+    fetchSchedule();
   }, [user]);
 
   if (loading) {
@@ -46,6 +62,13 @@ const TeacherSchedule = () => {
           Consultez votre emploi du temps hebdomadaire
         </p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <Alert type="error" dismissible onDismiss={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
       {/* Schedule Display */}
       {!schedule ? (

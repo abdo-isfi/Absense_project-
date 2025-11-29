@@ -83,6 +83,9 @@ export const updateTeacher = asyncHandler(async (req, res) => {
   if (email) teacher.email = email;
   if (matricule) teacher.matricule = matricule;
   if (password) teacher.password = password;
+  if (req.body.isActive !== undefined) teacher.isActive = req.body.isActive;
+
+  await teacher.save();
 
   const teacherData = {
     ...teacher.toObject(),

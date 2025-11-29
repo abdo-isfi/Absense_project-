@@ -3,6 +3,7 @@ import { Dialog } from '@headlessui/react';
 import { XMarkIcon, CloudArrowUpIcon, DocumentIcon } from '@heroicons/react/24/outline';
 import Button from '../ui/Button';
 import api from '../../services/api';
+import teacherService from '../../services/teacherService';
 import { API_URL } from '../../utils/constants';
 
 const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave, readOnly = false }) => {
@@ -34,16 +35,8 @@ const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave, readOnly = fals
           setFileType('application/octet-stream');
         }
       } else {
-        // Fallback to local storage for legacy/local-only data
-        const schedules = JSON.parse(localStorage.getItem('teacherSchedules') || '{}');
-        if (schedules[teacher._id] || schedules[teacher.id]) {
-          const id = teacher._id || teacher.id;
-          setPreview(schedules[id].preview);
-          setFileType(schedules[id].type);
-        } else {
-          setPreview(null);
-          setFileType(null);
-        }
+        setPreview(null);
+        setFileType(null);
       }
     }
   }, [isOpen, teacher]);
@@ -75,31 +68,15 @@ const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave, readOnly = fals
 
     setUploading(true);
     try {
-      // Try to upload to backend first
-      const formData = new FormData();
-      formData.append('schedule', file);
-      
       const teacherId = teacher._id || teacher.id;
-
-      try {
-        await api.post(`/teachers/${teacherId}/schedule`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } catch (apiError) {
-        console.warn('Backend upload failed, falling back to local storage', apiError);
-        // Fallback to local storage
-        const schedules = JSON.parse(localStorage.getItem('teacherSchedules') || '{}');
-        schedules[teacherId] = {
-          preview: preview,
-          type: fileType,
-          updatedAt: new Date().toISOString()
-        };
-        localStorage.setItem('teacherSchedules', JSON.stringify(schedules));
-      }
+      
+      // Use teacherService to upload
+      await teacherService.uploadSchedule(teacherId, file);
 
       if (onSave) onSave();
       onClose();
     } catch (err) {
+      console.error('Upload error:', err);
       setError('Erreur lors de l\'enregistrement de l\'emploi du temps');
     } finally {
       setUploading(false);

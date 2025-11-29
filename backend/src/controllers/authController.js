@@ -49,6 +49,14 @@ export const login = asyncHandler(async (req, res) => {
   const sgUser = await User.findOne({ email, role: 'sg' }).select('+password');
   
   if (sgUser && await sgUser.comparePassword(password)) {
+    // Check if account is active
+    if (sgUser.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is inactive by admin',
+      });
+    }
+    
     const token = generateToken(sgUser._id);
     
     return res.json({
@@ -70,6 +78,14 @@ export const login = asyncHandler(async (req, res) => {
   const teacher = await Teacher.findOne({ email }).select('+password').populate('groups');
   
   if (teacher && await teacher.comparePassword(password)) {
+    // Check if account is active
+    if (teacher.isActive === false) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account is inactive by admin',
+      });
+    }
+    
     const token = generateToken(teacher._id);
     
     return res.json({

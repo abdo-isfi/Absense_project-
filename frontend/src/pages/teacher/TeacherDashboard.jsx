@@ -11,16 +11,92 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import { ROUTES } from '../../utils/constants';
 import { useAuthContext } from '../../context/AuthContext';
+import teacherService from '../../services/teacherService';
+import absenceService from '../../services/absenceService';
+import groupService from '../../services/groupService';
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuthContext();
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    classesToday: 3,
-    absencesMarked: 12,
-    totalStudents: 45,
-    pendingActions: 2,
+    myGroupsCount: 0,
+    absencesMarked: 0,
+    totalStudents: 0,
+    pendingActions: 0,
   });
+  const [recentActivities, setRecentActivities] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id) return;
+
+      try {
+        setLoading(true);
+        
+        // 1. Fetch Teacher Details to get assigned groups
+        const teacherData = await teacherService.getById(user.id);
+        const teacherGroups = teacherData.data.groups || []; // Array of group names or objects depending on populate
+        
+        // 2. Fetch All Groups to get student counts
+        // We need to match teacherGroups (names) with actual group objects to get counts if needed
+        // Assuming teacherGroups are just names from the controller we saw earlier: groups: teacher.groups.map(g => g.name)
+        const allGroups = await groupService.getAllGroups();
+        const myGroups = allGroups.filter(g => teacherGroups.includes(g.name));
+        
+        const totalStudents = myGroups.reduce((acc, curr) => acc + (curr.trainees?.length || 0), 0);
+
+        // 3. Fetch Absences to count marked absences and get recent activity
+        // We'll fetch all and filter by teacherId on frontend for now
+        const allAbsences = await absenceService.getAll();
+        const myAbsences = allAbsences.data.filter(record => 
+          record.teacher?._id === user.id || record.teacher === user.id
+        );
+
+        // Calculate Stats
+        setStats({
+          myGroupsCount: teacherGroups.length,
+          absencesMarked: myAbsences.length,
+          totalStudents: totalStudents,
+          pendingActions: 0, // Placeholder
+        });
+
+        // Generate Recent Activity
+        // Sort by date desc
+        const sortedAbsences = myAbsences.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+        
+        const activities = sortedAbsences.map(record => {
+          const date = new Date(record.date).toLocaleDateString('fr-FR');
+          const timeDiff = getTimeDifference(new Date(record.createdAt));
+          
+          return {
+            id: record._id,
+            text: `Absences marquées pour ${record.group?.name || 'Groupe'} - ${date}`,
+            time: timeDiff
+          };
+        });
+        
+        setRecentActivities(activities);
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const getTimeDifference = (date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return 'À l\'instant';
+    if (diffInSeconds < 3600) return `Il y a ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `Il y a ${Math.floor(diffInSeconds / 3600)} h`;
+    return `Il y a ${Math.floor(diffInSeconds / 86400)} j`;
+  };
 
   const quickActions = [
     {
@@ -39,11 +115,13 @@ const TeacherDashboard = () => {
     },
   ];
 
-  const recentActivities = [
-    { id: 1, text: 'Absences marquées pour Groupe A - 22/11/2025', time: 'Il y a 2 heures' },
-    { id: 2, text: 'Absences marquées pour Groupe B - 21/11/2025', time: 'Hier' },
-    { id: 3, text: 'Emploi du temps mis à jour', time: 'Il y a 3 jours' },
-  ];
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -58,14 +136,14 @@ const TeacherDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 desktop:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <Card className="border-l-4 border-l-primary-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Classes Aujourd'hui</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.classesToday}</p>
+              <p className="text-sm font-medium text-gray-600">Mes Groupes</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{stats.myGroupsCount}</p>
             </div>
-            <CalendarIcon className="h-12 w-12 text-primary-500" />
+            <UserGroupIcon className="h-12 w-12 text-primary-500" />
           </div>
         </Card>
 
@@ -102,7 +180,7 @@ const TeacherDashboard = () => {
 
       {/* Quick Actions */}
       <Card header="Actions Rapides">
-        <div className="grid grid-cols-1 desktop:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {quickActions.map((action, index) => (
             <div
               key={index}
@@ -126,15 +204,19 @@ const TeacherDashboard = () => {
       {/* Recent Activity */}
       <Card header="Activité Récente">
         <div className="space-y-4">
-          {recentActivities.map((activity) => (
-            <div key={activity.id} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-              <div className="h-2 w-2 bg-primary-500 rounded-full mt-2" />
-              <div className="flex-1">
-                <p className="text-sm text-gray-900">{activity.text}</p>
-                <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+          {recentActivities.length > 0 ? (
+            recentActivities.map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                <div className="h-2 w-2 bg-primary-500 rounded-full mt-2" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-900">{activity.text}</p>
+                  <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">Aucune activité récente</p>
+          )}
         </div>
       </Card>
     </div>

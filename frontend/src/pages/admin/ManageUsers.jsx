@@ -53,7 +53,7 @@ const ManageUsers = () => {
         name: user.name,
         email: user.email,
         role: user.role,
-        isActive: user.status === 'active',
+        isActive: user.isActive !== undefined ? user.isActive : (user.status === 'active'),
         createdAt: user.createdAt,
         groups: user.groups || [] // Ensure groups array exists
       }));
@@ -113,9 +113,11 @@ const ManageUsers = () => {
 
   const handleToggleStatus = async (user) => {
     try {
-      // TODO: Implement toggle status API call
+      const newStatus = !user.isActive;
+      await userService.updateUser(user.id, { isActive: newStatus }, user.role);
+      
       setUsers(users.map(u => 
-        u.id === user.id ? { ...u, isActive: !u.isActive } : u
+        u.id === user.id ? { ...u, isActive: newStatus } : u
       ));
       setSuccess(`Statut de ${user.email} mis à jour`);
     } catch (err) {
