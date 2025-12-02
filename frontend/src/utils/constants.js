@@ -50,7 +50,7 @@ export const ROUTES = {
     ADD_USER: '/admin/ajouter',
     MANAGE_USERS: '/admin/gerer',
     EDIT_USER: '/admin/edit/:id',
-    SETTINGS: '/admin/parametres',
+    TIMETABLE_BUILDER: '/admin/emploi-du-temps',
   },
 };
 
@@ -68,3 +68,9 @@ export const DATE_FORMATS = {
   API: 'YYYY-MM-DD',
   DATETIME: 'DD/MM/YYYY HH:mm',
 };
+
+// Schedule Constants
+export const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+export const TIME_SLOTS = ['08:30-11:00', '11:00-13:30', '13:30-16:00', '16:00-18:30'];
+export const SESSION_TYPES = ['Cours', 'TD', 'TP'];
+

@@ -54,7 +54,7 @@ export const getTeacher = asyncHandler(async (req, res) => {
 
   const teacherData = {
     ...teacher.toObject(),
-    groups: teacher.groups.map(g => g.name),
+    groups: teacher.groups,
   };
 
   res.json({
@@ -85,11 +85,18 @@ export const updateTeacher = asyncHandler(async (req, res) => {
   if (password) teacher.password = password;
   if (req.body.isActive !== undefined) teacher.isActive = req.body.isActive;
 
+  // Handle groups update
+  if (groups) {
+    // If groups are provided as names, look up their IDs
+    const groupDocs = await Group.find({ name: { $in: groups } });
+    teacher.groups = groupDocs.map(g => g._id);
+  }
+
   await teacher.save();
 
   const teacherData = {
     ...teacher.toObject(),
-    groups: teacher.groups.map(g => g.name),
+    groups: teacher.groups,
   };
 
   res.json({

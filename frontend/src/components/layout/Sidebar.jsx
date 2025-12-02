@@ -11,6 +11,7 @@ import {
   ArrowDownTrayIcon,
   Cog6ToothIcon,
   UserPlusIcon,
+  AcademicCapIcon,
 } from '@heroicons/react/24/outline';
 import { cn } from '../../utils/cn';
 import { ROUTES, USER_ROLES } from '../../utils/constants';
@@ -38,9 +39,9 @@ const Sidebar = ({ userRole, isCollapsed = false }) => {
       case USER_ROLES.ADMIN:
         return [
           { name: 'Dashboard', icon: HomeIcon, path: ROUTES.ADMIN.DASHBOARD },
+          { name: 'Emploi du Temps', icon: CalendarIcon, path: ROUTES.ADMIN.TIMETABLE_BUILDER },
           { name: 'Ajouter Utilisateur', icon: UserPlusIcon, path: ROUTES.ADMIN.ADD_USER },
           { name: 'Gérer Utilisateurs', icon: UsersIcon, path: ROUTES.ADMIN.MANAGE_USERS },
-          { name: 'Paramètres', icon: Cog6ToothIcon, path: '/admin/settings' },
         ];
       
       default:
@@ -57,12 +58,16 @@ const Sidebar = ({ userRole, isCollapsed = false }) => {
     )}>
       {/* Logo */}
       <div className="h-16 flex items-center justify-center border-b border-gray-200">
-        <h2 className={cn(
-          'font-bold text-primary-600 transition-all',
-          isCollapsed ? 'text-xl' : 'text-2xl'
+        <div className={cn(
+          'flex items-center gap-2 font-bold text-primary-600 transition-all',
+          isCollapsed ? 'flex-col text-xs' : 'text-2xl'
         )}>
-          {isCollapsed ? 'IN' : 'ISTA NTIC'}
-        </h2>
+          <AcademicCapIcon className={cn(
+            "transition-all",
+            isCollapsed ? "h-8 w-8" : "h-8 w-8"
+          )} />
+          <span>{isCollapsed ? '' : 'OFPPT'}</span>
+        </div>
       </div>
 
       {/* Navigation */}

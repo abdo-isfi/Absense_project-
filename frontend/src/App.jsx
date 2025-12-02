@@ -16,7 +16,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AddUser from './pages/admin/AddUser';
 import ManageUsers from './pages/admin/ManageUsers';
 import EditUser from './pages/admin/EditUser';
-import Settings from './pages/admin/Settings';
+import TimetableBuilder from './pages/admin/TimetableBuilder';
 import { ROUTES, USER_ROLES } from './utils/constants';
 import './App.css';
 
@@ -138,10 +138,10 @@ function App() {
             </ProtectedRoute>
           } />
           
-          <Route path={ROUTES.ADMIN.SETTINGS} element={
+          <Route path={ROUTES.ADMIN.TIMETABLE_BUILDER} element={
             <ProtectedRoute allowedRoles={[USER_ROLES.ADMIN]}>
               <DashboardLayout>
-                <Settings />
+                <TimetableBuilder />
               </DashboardLayout>
             </ProtectedRoute>
           } />

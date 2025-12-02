@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../../context/AuthContext';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 import authService from '../../services/authService';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -159,12 +159,17 @@ const LoginPage = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-primary-600 mb-2">
-              ISTA NTIC
-            </h1>
-            <p className="text-gray-600">
-              Système de Gestion des Absences
-            </p>
+            <div className="flex flex-col items-center justify-center mb-2">
+              <div className="h-16 w-16 bg-primary-100 rounded-full flex items-center justify-center mb-4">
+                <AcademicCapIcon className="h-10 w-10 text-primary-600" />
+              </div>
+              <h1 className="text-3xl font-bold text-primary-600">
+                OFPPT
+              </h1>
+              <p className="text-gray-600">
+                Système de Gestion des Absences
+              </p>
+            </div>
           </div>
 
           {/* Login Form */}

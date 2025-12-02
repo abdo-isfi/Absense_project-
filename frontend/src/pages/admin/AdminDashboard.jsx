@@ -2,8 +2,10 @@ import { useNavigate } from 'react-router-dom';
 import { 
   UsersIcon, 
   UserPlusIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
+  AcademicCapIcon,
+  ClipboardDocumentCheckIcon,
+  UserGroupIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -18,9 +20,9 @@ const AdminDashboard = () => {
   const { user } = useAuthContext();
 
   const [stats, setStats] = useState([
-    { label: 'Formateurs', value: 0, icon: UsersIcon, color: 'success' },
-    { label: 'Surveillants Généraux', value: 0, icon: UsersIcon, color: 'info' },
-    { label: 'Groupes', value: 0, icon: UsersIcon, color: 'primary' },
+    { label: 'Formateurs', value: 0, icon: AcademicCapIcon, color: 'green' },
+    { label: 'Surveillants Généraux', value: 0, icon: ClipboardDocumentCheckIcon, color: 'orange' },
+    { label: 'Groupes', value: 0, icon: UserGroupIcon, color: 'primary' },
   ]);
 
   useEffect(() => {
@@ -36,9 +38,9 @@ const AdminDashboard = () => {
         const groupsCount = groups.data ? groups.data.length : (Array.isArray(groups) ? groups.length : 0);
 
         setStats([
-          { label: 'Formateurs', value: teachersCount, icon: UsersIcon, color: 'success' },
-          { label: 'Surveillants Généraux', value: sgCount, icon: UsersIcon, color: 'info' },
-          { label: 'Groupes', value: groupsCount, icon: UsersIcon, color: 'primary' },
+          { label: 'Formateurs', value: teachersCount, icon: AcademicCapIcon, color: 'green' },
+          { label: 'Surveillants Généraux', value: sgCount, icon: ClipboardDocumentCheckIcon, color: 'orange' },
+          { label: 'Groupes', value: groupsCount, icon: UserGroupIcon, color: 'primary' },
         ]);
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -46,9 +48,17 @@ const AdminDashboard = () => {
     };
 
     fetchStats();
+    fetchStats();
   }, []);
 
   const quickActions = [
+    {
+      title: 'Créer Emploi du Temps',
+      description: 'Créer un emploi du temps pour un formateur',
+      icon: CalendarIcon,
+      color: 'primary',
+      action: () => navigate(ROUTES.ADMIN.TIMETABLE_BUILDER),
+    },
     {
       title: 'Ajouter un Utilisateur',
       description: 'Créer un nouveau compte utilisateur',
@@ -63,26 +73,6 @@ const AdminDashboard = () => {
       color: 'success',
       action: () => navigate(ROUTES.ADMIN.MANAGE_USERS),
     },
-    {
-      title: 'Statistiques',
-      description: 'Voir les statistiques du système',
-      icon: ChartBarIcon,
-      color: 'info',
-      action: () => {},
-    },
-    {
-      title: 'Paramètres',
-      description: 'Configurer le système',
-      icon: Cog6ToothIcon,
-      color: 'default',
-      action: () => {},
-    },
-  ];
-
-  const recentActivities = [
-    { id: 1, text: 'Nouvel utilisateur créé: teacher@ofppt.ma', time: 'Il y a 2 heures' },
-    { id: 2, text: 'Mot de passe réinitialisé pour sg@ofppt.ma', time: 'Hier' },
-    { id: 3, text: 'Utilisateur supprimé: old.user@ofppt.ma', time: 'Il y a 3 jours' },
   ];
 
   return (
@@ -98,7 +88,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 desktop:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, index) => (
           <Card key={index} className={`border-l-4 border-l-${stat.color}-500`}>
             <div className="flex items-center justify-between">
@@ -114,7 +104,7 @@ const AdminDashboard = () => {
 
       {/* Quick Actions */}
       <Card header="Actions Rapides">
-        <div className="grid grid-cols-1 desktop:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {quickActions.map((action, index) => (
             <div
               key={index}
@@ -129,21 +119,6 @@ const AdminDashboard = () => {
                   <h3 className="font-semibold text-gray-900 mb-1">{action.title}</h3>
                   <p className="text-sm text-gray-600">{action.description}</p>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card header="Activité Récente">
-        <div className="space-y-4">
-          {recentActivities.map((activity) => (
-            <div key={activity.id} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-              <div className="h-2 w-2 bg-primary-500 rounded-full mt-2" />
-              <div className="flex-1">
-                <p className="text-sm text-gray-900">{activity.text}</p>
-                <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
               </div>
             </div>
           ))}

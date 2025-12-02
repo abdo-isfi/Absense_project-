@@ -18,6 +18,7 @@ import groupRoutes from './routes/group.routes.js';
 import teacherRoutes from './routes/teacher.routes.js';
 import absenceRoutes from './routes/absence.routes.js';
 import traineeAbsenceRoutes from './routes/trainee-absence.routes.js';
+import scheduleRoutes from './routes/scheduleRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -110,6 +111,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/absences', absenceRoutes);
 app.use('/api/trainee-absences', traineeAbsenceRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
 // 404 handler
 app.use((req, res) => {
