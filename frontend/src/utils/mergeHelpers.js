@@ -79,8 +79,14 @@ export const canExtend = (currentBlock, nextDay, nextTimeSlot, sessions, teacher
     return { canExtend: false, reason: 'Different day' };
   }
 
+  // Get the last time slot of the current block to check for continuity
+  let lastTimeSlot = currentBlock.timeSlot;
+  if (currentBlock.isMerged && currentBlock.originalSlots && currentBlock.originalSlots.length > 0) {
+    lastTimeSlot = currentBlock.originalSlots[currentBlock.originalSlots.length - 1];
+  }
+
   // Check if next slot is consecutive
-  const expectedNextSlot = getNextTimeSlot(currentBlock.timeSlot);
+  const expectedNextSlot = getNextTimeSlot(lastTimeSlot);
   if (expectedNextSlot !== nextTimeSlot) {
     return { canExtend: false, reason: 'Not consecutive time slot' };
   }

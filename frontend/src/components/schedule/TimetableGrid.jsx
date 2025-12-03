@@ -234,14 +234,9 @@ const TimetableGrid = ({ sessions, onEditSession, onNext, onBack, activeBlock, o
                                 <p className="text-sm font-bold text-gray-700 truncate w-full mt-1">
                                   {session.room}
                                 </p>
-                                {session.subject && (
-                                  <p className="text-xs text-gray-500 truncate w-full mt-1">
-                                    {session.subject}
-                                  </p>
-                                )}
-                                
-                                {/* Type and Mode Badges */}
-                                <div className="flex gap-1 mt-2 flex-wrap justify-center">
+                             
+                                {/* Type, Mode, and Subject Badges */}
+                                <div className="flex gap-1 mt-2 flex-uwrap justify-center">
                                   {/* Type Badge */}
                                   <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
                                     session.type === 'Cours' 
@@ -261,6 +256,13 @@ const TimetableGrid = ({ sessions, onEditSession, onNext, onBack, activeBlock, o
                                         : 'bg-green-100 text-green-700 border border-green-300'
                                     }`}>
                                       {session.mode === 'À distance' ? '🌐 Distance' : '🏫 Présentiel'}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Subject Badge */}
+                                  {session.subject && (
+                                    <div className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-300">
+                                      📖 {session.subject}
                                     </div>
                                   )}
                                 </div>

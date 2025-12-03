@@ -126,8 +126,9 @@ const SessionModal = ({
       setError('Le groupe est requis');
       return;
     }
-    if (!formData.room.trim()) {
-      setError('La salle est requise');
+    // Room is only required for Présentiel mode
+    if (formData.mode === 'Présentiel' && !formData.room.trim()) {
+      setError('La salle est requise pour les séances en présentiel');
       return;
     }
 
@@ -287,8 +288,9 @@ const SessionModal = ({
           type="text"
           value={formData.room}
           onChange={(e) => handleChange('room', e.target.value)}
-          placeholder="Ex: Salle 101"
-          required
+          placeholder={formData.mode === 'À distance' ? 'Non applicable pour les séances à distance' : 'Ex: Salle 101'}
+          required={formData.mode === 'Présentiel'}
+          disabled={formData.mode === 'À distance'}
         />
 
         <div>

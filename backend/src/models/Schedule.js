@@ -13,7 +13,7 @@ const sessionSchema = new mongoose.Schema({
   },
   subject: {
     type: String,
-    required: [true, 'Subject is required'],
+    required: false,
     trim: true,
   },
   group: {
@@ -23,13 +23,18 @@ const sessionSchema = new mongoose.Schema({
   },
   room: {
     type: String,
-    required: [true, 'Room is required'],
+    required: false,
     trim: true,
   },
   type: {
     type: String,
     required: [true, 'Session type is required'],
     enum: ['Cours', 'TD', 'TP'],
+  },
+  mode: {
+    type: String,
+    enum: ['Présentiel', 'À distance'],
+    default: 'Présentiel',
   },
   notes: {
     type: String,

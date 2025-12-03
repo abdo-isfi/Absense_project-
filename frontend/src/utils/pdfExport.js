@@ -10,7 +10,7 @@ const TIME_SLOTS = ['08:30-11:00', '11:00-13:30', '13:30-16:00', '16:00-18:30'];
  * @param {Array} sessions - Array of session objects
  */
 export const exportToPDF = (teacher, sessions) => {
-  const doc = new new jsPDF('landscape');
+  const doc = new jsPDF('landscape');
   
   // Minimal Header
   doc.setFontSize(14);
@@ -198,13 +198,9 @@ export const exportToPDF = (teacher, sessions) => {
     );
   }
   
-  // Statistics
+  // Statistics - displayed horizontally at bottom
   const finalY = doc.lastAutoTable.finalY + 10;
-  if (finalY < doc.internal.pageSize.height - 40) {
-    doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
-    doc.text('Statistiques:', 14, finalY);
-    
+  if (finalY < doc.internal.pageSize.height - 30) {
     const totalSessions = sessions.length;
     // Calculate total hours including merged sessions
     const totalHours = sessions.reduce((total, session) => {
@@ -219,18 +215,11 @@ export const exportToPDF = (teacher, sessions) => {
       return acc;
     }, {});
     
-    const sessionsByMode = sessions.reduce((acc, s) => {
-      if (s.mode) {
-        acc[s.mode] = (acc[s.mode] || 0) + 1;
-      }
-      return acc;
-    }, { 'Présentiel': 0, 'À distance': 0 });
-    
+    // Display all statistics on one line
     doc.setFontSize(9);
-    doc.text(`Total séances: ${totalSessions}`, 14, finalY + 7);
-    doc.text(`Total heures: ${totalHours}h`, 14, finalY + 14);
-    doc.text(`Cours: ${sessionsByType.Cours || 0} | TD: ${sessionsByType.TD || 0} | TP: ${sessionsByType.TP || 0}`, 14, finalY + 21);
-    doc.text(`🏫 Présentiel: ${sessionsByMode['Présentiel']} | 🌐 À distance: ${sessionsByMode['À distance']}`, 14, finalY + 28);
+    doc.setTextColor(60, 60, 60);
+    const statsText = `Total seances: ${totalSessions}  |  Total heures: ${totalHours}h  |  Cours: ${sessionsByType.Cours || 0} | TD: ${sessionsByType.TD || 0} | TP: ${sessionsByType.TP || 0}`;
+    doc.text(statsText, 14, finalY);
   }
   
   // Save PDF

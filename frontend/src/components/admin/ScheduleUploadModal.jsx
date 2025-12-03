@@ -1,24 +1,58 @@
 import { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
-import { XMarkIcon, CloudArrowUpIcon, DocumentIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CloudArrowUpIcon, DocumentIcon, CheckCircleIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import Button from '../ui/Button';
 import api from '../../services/api';
 import teacherService from '../../services/teacherService';
+import scheduleService from '../../services/scheduleService';
 import { API_URL } from '../../utils/constants';
+import { useNavigate } from 'react-router-dom';
 
 const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave, readOnly = false }) => {
+  const navigate = useNavigate();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [fileType, setFileType] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [hasSchedule, setHasSchedule] = useState(false);
+  const [scheduleData, setScheduleData] = useState(null);
+  const [checkingSchedule, setCheckingSchedule] = useState(false);
 
   useEffect(() => {
+    const checkDatabaseSchedule = async () => {
+      if (!teacher) return;
+      
+      try {
+        setCheckingSchedule(true);
+        const teacherId = teacher._id || teacher.id;
+        const response = await scheduleService.getScheduleByTeacher(teacherId);
+        
+        if (response.success && response.data) {
+          setHasSchedule(true);
+          setScheduleData(response.data);
+        }
+      } catch (err) {
+        // 404 is expected if no schedule exists
+        if (err.response?.status !== 404) {
+          console.error('Error checking schedule:', err);
+        }
+      } finally {
+        setCheckingSchedule(false);
+      }
+    };
+
     if (isOpen && teacher) {
-      // Reset state
+      // Reset state for file upload
       setFile(null);
       setError('');
+      setHasSchedule(false);
+      setScheduleData(null);
 
+      // Check for database schedule
+      checkDatabaseSchedule();
+
+      // Check for uploaded file schedule
       if (teacher.schedulePath) {
         // Use backend URL
         const baseUrl = API_URL.replace('/api', '');
@@ -100,6 +134,65 @@ const ScheduleUploadModal = ({ isOpen, onClose, teacher, onSave, readOnly = fals
           </div>
 
           <div className="p-6 space-y-4">
+            {/* Database Schedule Status */}
+            {checkingSchedule ? (
+              <div className="p-4 bg-gray-50 rounded-lg flex items-center gap-3">
+                <div className="animate-spin h-5 w-5 border-2 border-primary-600 border-t-transparent rounded-full" />
+                <span className="text-sm text-gray-600">Vérification de l'emploi du temps...</span>
+              </div>
+            ) : hasSchedule ? (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <CheckCircleIcon className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-green-900">Emploi du temps existant</p>
+                      <p className="text-sm text-green-700 mt-1">
+                        Ce formateur a déjà un emploi du temps dans le système
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Année: {scheduleData?.academicYear} | Dernière mise à jour: {new Date(scheduleData?.updatedAt).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      onClose();
+                      navigate('/admin/emploi-du-temps');
+                    }}
+                    icon={PencilSquareIcon}
+                  >
+                    Modifier
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <DocumentIcon className="h-6 w-6 text-blue-600 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-blue-900">Aucun emploi du temps</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Créez un emploi du temps pour ce formateur
+                    </p>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        onClose();
+                        navigate('/admin/emploi-du-temps');
+                      }}
+                      className="mt-2"
+                    >
+                      Créer un emploi du temps
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="p-3 bg-red-50 text-red-700 rounded-lg text-sm">
                 {error}

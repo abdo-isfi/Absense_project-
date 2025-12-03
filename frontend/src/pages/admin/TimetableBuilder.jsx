@@ -37,10 +37,39 @@ const TimetableBuilder = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [loadingSchedule, setLoadingSchedule] = useState(false);
 
   // Step 1: Teacher Selection
-  const handleSelectTeacher = (teacher) => {
+  const handleSelectTeacher = async (teacher) => {
     setSelectedTeacher(teacher);
+    
+    // Check if teacher already has a schedule
+    try {
+      setLoadingSchedule(true);
+      const response = await scheduleService.getScheduleByTeacher(teacher._id);
+      
+      if (response.success && response.data) {
+        // Teacher has an existing schedule
+        const existingSchedule = response.data;
+        setScheduleId(existingSchedule._id);
+        setSessions(existingSchedule.sessions || []);
+        setSuccess(`Emploi du temps existant chargé pour ${teacher.firstName} ${teacher.lastName}. Vous pouvez le modifier.`);
+      } else {
+        // No existing schedule
+        setSessions([]);
+        setScheduleId(null);
+      }
+    } catch (err) {
+      // 404 means no schedule exists, which is fine
+      if (err.response?.status === 404) {
+        setSessions([]);
+        setScheduleId(null);
+      } else {
+        console.error('Error checking for existing schedule:', err);
+      }
+    } finally {
+      setLoadingSchedule(false);
+    }
   };
 
   const handleNextFromStep1 = () => {

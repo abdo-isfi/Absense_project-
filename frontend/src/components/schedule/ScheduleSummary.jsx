@@ -158,7 +158,7 @@ const ScheduleSummary = ({
                     {TIME_SLOTS.map((slot) => (
                       <th
                         key={slot}
-                        className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-48 min-w-[12rem]"
                       >
                         {slot}
                       </th>
@@ -189,19 +189,14 @@ const ScheduleSummary = ({
                           >
                             {session ? (
                               <div className={`p-3 rounded-lg border-2 ${SESSION_TYPE_COLORS[session.type]} h-24`}>
-                                <div className="text-left h-full flex flex-col justify-between">
-                                  <div>
-                                    <p className="font-bold text-sm truncate">
+                                <div className="text-center h-full flex flex-col justify-center items-center">
+                                  <div className="w-full">
+                                    <p className="text-xl font-extrabold text-gray-900 truncate w-full">
                                       {session.group?.name || session.group}
                                     </p>
-                                    <p className="text-xs truncate mt-1">
-                                      Salle: {session.room}
+                                    <p className="text-sm font-bold text-gray-700 truncate w-full mt-1">
+                                      {session.room}
                                     </p>
-                                    {session.subject && (
-                                      <p className="text-xs truncate">
-                                        {session.subject}
-                                      </p>
-                                    )}
                                   </div>
                                   <div className="flex gap-1 flex-wrap mt-2">
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -211,7 +206,7 @@ const ScheduleSummary = ({
                                         ? 'bg-orange-200 text-orange-800'
                                         : 'bg-pink-200 text-pink-800'
                                     }`}>
-                                      {session.type}
+                                      {session.type === 'Cours' ? '📚 Cours' : session.type === 'TD' ? '✏️ TD' : '🔬 TP'}
                                     </span>
                                     {session.mode && (
                                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -219,7 +214,12 @@ const ScheduleSummary = ({
                                           ? 'bg-purple-200 text-purple-800' 
                                           : 'bg-green-200 text-green-800'
                                       }`}>
-                                        {session.mode === 'À distance' ? '🌐' : '🏫'}
+                                        {session.mode === 'À distance' ? '🌐 Distance' : '🏫 Présentiel'}
+                                      </span>
+                                    )}
+                                    {session.subject && (
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-800">
+                                        📖 {session.subject}
                                       </span>
                                     )}
                                   </div>
